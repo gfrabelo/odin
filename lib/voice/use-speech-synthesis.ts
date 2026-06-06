@@ -4,55 +4,96 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { stripMarkdownForSpeech } from "./strip";
 
 /**
- * Síntese de fala (TTS) via Web Speech API.
- * `enabled` é o toggle do "Odin fala"; `speak` lê um texto (markdown limpo).
+ * Síntese de fala (TTS) via API da OpenAI (rota /api/tts).
+ * `enabled` é o toggle do "Odin fala"; `speak` lê um texto enviando-o para a rota.
  */
 export function useSpeechSynthesis(lang = "pt-BR") {
   const [supported, setSupported] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    setSupported(true);
-
-    const pickVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      voiceRef.current =
-        voices.find((v) => v.lang?.toLowerCase().startsWith("pt")) ??
-        voices[0] ??
-        null;
-    };
-    pickVoice();
-    window.speechSynthesis.onvoiceschanged = pickVoice;
+    if (typeof window !== "undefined") {
+      setSupported(true);
+    }
     return () => {
-      window.speechSynthesis.onvoiceschanged = null;
+      // Limpeza ao desmontar
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
     };
   }, []);
 
   const cancel = useCallback(() => {
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      setSpeaking(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+    setSpeaking(false);
   }, []);
 
   const speak = useCallback(
-    (text: string) => {
-      if (typeof window === "undefined" || !window.speechSynthesis) return;
+    async (text: string) => {
       const clean = stripMarkdownForSpeech(text);
       if (!clean) return;
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(clean);
-      utterance.lang = lang;
-      if (voiceRef.current) utterance.voice = voiceRef.current;
-      utterance.onstart = () => setSpeaking(true);
-      utterance.onend = () => setSpeaking(false);
-      utterance.onerror = () => setSpeaking(false);
-      window.speechSynthesis.speak(utterance);
+
+      cancel(); // Para áudio anterior
+
+      try {
+        const response = await fetch("/api/tts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text: clean }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || "Erro ao sintetizar voz.");
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        audioUrlRef.current = url;
+
+        const audio = new Audio(url);
+        audioRef.current = audio;
+
+        audio.onplay = () => setSpeaking(true);
+        audio.onended = () => {
+          setSpeaking(false);
+          if (audioUrlRef.current === url) {
+            URL.revokeObjectURL(url);
+            audioUrlRef.current = null;
+          }
+        };
+        audio.onerror = () => {
+          setSpeaking(false);
+          if (audioUrlRef.current === url) {
+            URL.revokeObjectURL(url);
+            audioUrlRef.current = null;
+          }
+        };
+
+        await audio.play();
+      } catch (err) {
+        console.error("Erro na síntese de voz:", err);
+        setSpeaking(false);
+      }
     },
-    [lang]
+    [cancel]
   );
 
   return { supported, enabled, setEnabled, speaking, speak, cancel };
