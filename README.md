@@ -1,36 +1,122 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ⚡ Odin — O Cockpit de IA & Segundo Cérebro do Futuro 🤖
 
-## Getting Started
+O **Odin** é um assistente de inteligência artificial pessoal projetado para funcionar como um orquestrador de conhecimento e um segundo cérebro externo. Ele une uma interface visual altamente imersiva e futurista de "cockpit" com uma camada avançada de **RAG (Retrieval-Augmented Generation)** conectada diretamente a um vault do Obsidian.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🌌 Visão Geral da Interface
+
+A interface do Odin foi concebida para parecer um terminal de comando premium e interativo:
+* **Robô 3D Interativo (Spline):** Um modelo 3D no centro da tela que reage em tempo real, acompanhando a movimentação do seu cursor com o olhar (*gaze tracking*).
+* **Background Dinâmico WebGL:** Um background animado de shader rodando em Three.js por trás do cockpit.
+* **Aparência Glassmorphism & UI Cyberpunk:** Controles semi-transparentes com efeito de vidro fosco, tons neon de ciano e cinza escuro, além de um cursor customizado em formato de mira (*crosshair*).
+* **Modo de Voz Integrado:** Controle completo por voz (fala e escuta) com feedbacks dinâmicos na tela.
+
+---
+
+## 🧠 Recursos Principais
+
+### 1. Camada RAG Integrada com Obsidian & Supabase 📚
+O Odin lê e indexa as suas notas pessoais armazenadas em um vault do Obsidian em formato Markdown, permitindo que a IA responda com contexto real da sua vida, projetos e anotações.
+* **Indexação Incremental (`npm run sync`):** Um script que verifica alterações nas notas usando hash SHA-1 e indexa apenas arquivos alterados ou novos no banco de dados.
+* **Auto-Sync:** Integrado com um Git Hook `post-commit` no vault Obsidian: ao commitar notas novas ou modificações no wiki, o Odin sincroniza o banco de dados automaticamente.
+* **Armazenamento Vetorial:** Banco de dados **Supabase (PostgreSQL)** com a extensão `pgvector` e índice HNSW para busca por similaridade de cosseno ultrarrápida.
+* **Embeddings Eficientes:** Embeddings gerados a partir do `gemini-embedding-001` otimizados para 768 dimensões.
+
+### 2. Conversação por Voz Nativa (STT & TTS) 🎙️
+* **Speech-to-Text (STT):** O Odin transcreve sua voz ao vivo através do navegador e envia o comando automaticamente quando você faz uma pausa natural.
+* **Text-to-Speech (TTS):** O Odin lê as respostas geradas utilizando a síntese de voz nativa do navegador (Web Speech API).
+* **Cancelamento Inteligente:** O áudio é interrompido imediatamente se você iniciar um novo comando ou desativar o botão de áudio no painel principal.
+
+### 3. Engenharia de Chat Robusta & Agnóstica ⚡
+* **Provider Isolado:** A lógica da IA fica encapsulada atrás de um contrato estável de streaming. O Odin hoje utiliza o SDK `@google/genai` (modelo `gemini-2.5-flash`), mas o core do app é agnóstico e pronto para multi-modelos (como Claude ou GPT).
+* **Fail-Safe:** Caso o Supabase esteja offline ou desconfigurado, o RAG falha silenciosamente e o Odin continua respondendo com o modelo geral de forma ininterrupta.
+
+---
+
+## 🏗️ Arquitetura do Fluxo de Dados
+
+Abaixo está o ciclo de vida de uma mensagem e o fluxo de sincronização do RAG:
+
+```mermaid
+graph TD
+    subgraph Obsidian Vault [Cérebro - Obsidian]
+        OB[Nota wiki/.md] -->|Commit / post-commit hook| SH[Git Hook post-commit]
+    end
+
+    subgraph Ingestão [Script de Sync]
+        SH -->|Dispara| SC[scripts/sync.ts]
+        SC -->|Gera hash & compara| DB_Check{Alterado?}
+        DB_Check -->|Sim| GEM_Emb[Gemini Embedding API]
+        GEM_Emb -->|Vetor 768d| SUP_DB[(Supabase pgvector)]
+    end
+
+    subgraph Cockpit UI [Odin Web App]
+        UI[page.tsx / Input] -->|POST /api/chat| API[api/chat/route.ts]
+        API -->|streamOdinResponse| CH[lib/ai/chat.ts]
+        CH -->|Busca contexto| RET[lib/rag/retrieve.ts]
+        RET -->|Match Documents| SUP_DB
+        RET -->|Retorna Chunks| CH
+        CH -->|Prompt + Contexto| GEM_Chat[Gemini 2.5 Flash API]
+        GEM_Chat -->|Text Stream| API
+        API -->|ReadableStream| UI
+    end
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🛠️ Tecnologias Utilizadas
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+* **Framework:** Next.js 16.2 (App Router, Turbopack)
+* **Estilização:** Tailwind CSS v4, Vanilla CSS (Custom Glassmorphism)
+* **3D / Gráficos:** `@splinetool/react-spline` & `Three.js` (WebGL Custom Shader)
+* **Banco de Dados:** Supabase (PostgreSQL) + `pgvector`
+* **Inteligência Artificial:** SDK Oficial do Gemini (`@google/genai`)
+* **Voz:** Web Speech API (Nativa do Navegador)
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🚀 Como Rodar o Projeto Localmente
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 1. Clonar o repositório
+```bash
+git clone https://github.com/gfrabelo/odin.git
+cd odin
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 2. Configurar Variáveis de Ambiente
+Crie um arquivo `.env.local` na raiz do projeto baseado no `.env.local.example`:
+```bash
+cp .env.local.example .env.local
+```
+Preencha com suas credenciais:
+* `GEMINI_API_KEY`: Sua chave de API do Google AI Studio.
+* `SUPABASE_URL`: URL do seu projeto no Supabase.
+* `SUPABASE_SERVICE_ROLE_KEY`: Chave de acesso de serviço (service role) do Supabase para leitura/escrita vetorial.
+* `VAULT_PATH`: Caminho local absoluto para o seu Vault do Obsidian (ex: `../segundo-cerebro`).
 
-## Deploy on Vercel
+### 3. Configurar o Banco de Dados (Supabase)
+Execute as queries SQL contidas em `supabase/schema.sql` no painel do Supabase (SQL Editor) para criar a tabela `documents`, os índices e a função de busca por similaridade `match_documents`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 4. Instalar Dependências e Rodar o Servidor de Dev
+```bash
+npm install
+npm run dev
+```
+O cockpit estará ativo em [http://localhost:3000](http://localhost:3000).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 5. Sincronizar o Vault Obsidian (RAG)
+Para popular o banco com as suas notas do Obsidian:
+```bash
+npm run sync
+```
+
+---
+
+## 🗺️ Roadmap Futuro
+
+* **[ ] Ações / Function Calling:** Permitir que o Odin crie ou edite notas diretamente no vault, pesquise na web ou execute scripts de automação.
+* **[ ] Persistência de Conversas:** Criação de múltiplos chats (threads) com histórico salvo localmente ou no Supabase.
+* **[ ] Citações Interativas:** Links clicáveis para abrir as notas originais do Obsidian diretamente pelo painel de chat.
+* **[ ] Visão Multimodal:** Enviar streams de câmera ou capturas de tela para que o Odin consiga te auxiliar de forma visual.
+* **[ ] Voz Contínua:** Modo de chamada em que o microfone se reativa de forma automática e contínua, permitindo diálogo dinâmico (com detecção de interrupções).
