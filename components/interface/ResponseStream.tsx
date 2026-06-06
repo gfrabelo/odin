@@ -1,0 +1,92 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { cn } from "@/lib/utils";
+import type { Message } from "@/types";
+
+interface ResponseStreamProps {
+  messages: Message[];
+  /** Texto parcial do assistant chegando em tempo real (vazio quando ocioso). */
+  streaming: string;
+}
+
+/**
+ * Conversa sobreposta ao 3D. Bolhas em vidro, markdown nas respostas do Odin.
+ * Scroll próprio bottom-anchored: mensagens curtas ficam ancoradas embaixo
+ * (perto do input); quando passam da altura, rolam — sempre seguindo o fim.
+ */
+export function ResponseStream({ messages, streaming }: ResponseStreamProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Segue o fim a cada token/mensagem. scrollTop = scrollHeight é o método
+  // mais confiável para chat (não depende de scrollIntoView no documento).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, streaming]);
+
+  return (
+    <div
+      ref={scrollRef}
+      className="odin-scroll pointer-events-auto min-h-0 flex-1 overflow-y-auto"
+    >
+      <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-end gap-4 px-4 py-2 md:px-10">
+        {messages.map((m, i) => (
+          <Bubble key={i} role={m.role} content={m.content} />
+        ))}
+
+        {streaming && <Bubble role="assistant" content={streaming} streaming />}
+      </div>
+    </div>
+  );
+}
+
+function Bubble({
+  role,
+  content,
+  streaming,
+}: {
+  role: Message["role"];
+  content: string;
+  streaming?: boolean;
+}) {
+  const isUser = role === "user";
+  return (
+    <div
+      className={cn(
+        "max-w-[min(36rem,85%)] animate-in fade-in slide-in-from-bottom-2 duration-300",
+        isUser ? "self-end" : "self-start"
+      )}
+    >
+      <div
+        className={cn(
+          "mb-1 font-mono text-[10px] uppercase tracking-[0.25em]",
+          isUser ? "text-right text-neutral-400" : "text-left text-[var(--odin-accent)]/80"
+        )}
+      >
+        {isUser ? "você" : "odin"}
+      </div>
+      <div
+        className={cn(
+          "rounded-2xl px-4 py-3 text-sm leading-relaxed",
+          isUser
+            ? "whitespace-pre-wrap bg-white/10 text-neutral-50 backdrop-blur-md"
+            : "glass text-neutral-100"
+        )}
+      >
+        {isUser ? (
+          content
+        ) : (
+          <div className="odin-md">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          </div>
+        )}
+        {streaming && (
+          <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-[var(--odin-accent)]" />
+        )}
+      </div>
+    </div>
+  );
+}

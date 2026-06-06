@@ -1,65 +1,199 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useCallback, useRef, useState } from "react";
+import { Volume2, VolumeX } from "lucide-react";
+import { OdinBackground } from "@/components/interface/OdinBackground";
+import { SplineScene } from "@/components/ui/splite";
+import { CommandInput } from "@/components/interface/CommandInput";
+import { ResponseStream } from "@/components/interface/ResponseStream";
+import { useSpeechSynthesis } from "@/lib/voice/use-speech-synthesis";
+import { cn } from "@/lib/utils";
+import type { Message } from "@/types";
+
+export default function Cockpit() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [streaming, setStreaming] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const hasConversation = messages.length > 0 || !!streaming;
+
+  // Voz do Odin (TTS). ttsEnabledRef evita closure obsoleto no handleSend.
+  const tts = useSpeechSynthesis();
+  const ttsEnabledRef = useRef(false);
+  ttsEnabledRef.current = tts.enabled;
+
+  const handleSend = useCallback(
+    async (text: string) => {
+      if (isLoading) return;
+
+      const userMessage: Message = { role: "user", content: text };
+      const history = [...messages, userMessage];
+
+      setMessages(history);
+      setStreaming("");
+      setIsLoading(true);
+      tts.cancel(); // Odin para de falar ao receber novo comando
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      let acc = "";
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: history }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok || !res.body) {
+          throw new Error(`Falha na resposta (${res.status}).`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          acc += decoder.decode(value, { stream: true });
+          setStreaming(acc);
+        }
+
+        setMessages([...history, { role: "assistant", content: acc }]);
+        if (ttsEnabledRef.current) tts.speak(acc); // Odin fala a resposta
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          // Interrompido pelo usuário: preserva o que já foi gerado.
+          setMessages([
+            ...history,
+            { role: "assistant", content: acc || "_(interrompido)_" },
+          ]);
+        } else {
+          const message = err instanceof Error ? err.message : "Erro desconhecido";
+          setMessages([
+            ...history,
+            { role: "assistant", content: `[Odin offline: ${message}]` },
+          ]);
+        }
+      } finally {
+        abortRef.current = null;
+        setStreaming("");
+        setIsLoading(false);
+      }
+    },
+    [isLoading, messages, tts]
+  );
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
+  const toggleVoice = useCallback(() => {
+    if (tts.enabled) {
+      tts.cancel();
+      tts.setEnabled(false);
+    } else {
+      tts.setEnabled(true);
+    }
+  }, [tts]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="relative flex h-dvh flex-col overflow-hidden">
+      {/* Camada -z-10: background puro (shader + spotlight + scrims) */}
+      <OdinBackground />
+
+      {/* Camada z-0: cena 3D interativa do robô Spline.
+          Renderizada diretamente na página para receber eventos de mouse
+          nativamente — é assim que o "look at" funciona. */}
+      <div className="fixed inset-0 md:left-[18%]">
+        <SplineScene
+          scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+          className="h-full w-full"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+      </div>
+
+      {/* Header — acima do Spline */}
+      <header className="z-10 flex items-center justify-between px-6 py-5 md:px-10">
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-sm font-semibold tracking-[0.4em] text-neutral-100">
+            ODIN
+          </span>
+          <span className="hidden text-[10px] uppercase tracking-[0.3em] text-neutral-500 sm:inline">
+            orquestrador de conhecimento
+          </span>
+        </div>
+        <div className="flex items-center gap-4">
+          {tts.supported && (
+            <button
+              type="button"
+              onClick={toggleVoice}
+              aria-label={tts.enabled ? "Desativar voz do Odin" : "Ativar voz do Odin"}
+              className={cn(
+                "grid size-8 cursor-pointer place-items-center rounded-lg transition-all duration-200",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--odin-accent)]",
+                tts.enabled
+                  ? "bg-[var(--odin-accent)]/15 text-[var(--odin-accent)]"
+                  : "text-neutral-500 hover:text-neutral-300",
+                tts.speaking && "animate-pulse"
+              )}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+              {tts.enabled ? (
+                <Volume2 className="size-4" />
+              ) : (
+                <VolumeX className="size-4" />
+              )}
+            </button>
+          )}
+          <div className="flex items-center gap-2">
+            <span className="size-2 animate-pulse rounded-full bg-[var(--odin-accent)] shadow-[0_0_12px_var(--odin-accent)]" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-neutral-400">
+              online
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* Área central: hero (vazio) ou conversa.
+          Scroll é full-bleed (barra na borda da tela); o conteúdo é
+          centralizado em max-w-3xl dentro do ResponseStream. */}
+      <section className="z-10 flex min-h-0 flex-1 flex-col pb-3 pointer-events-none">
+        {hasConversation ? (
+          <ResponseStream messages={messages} streaming={streaming} />
+        ) : (
+          <div className="mx-auto mt-auto w-full max-w-3xl px-4 md:px-10">
+            <Hero />
+          </div>
+        )}
+      </section>
+
+      {/* Comando */}
+      <section className="z-10 pb-6 md:pb-8 pointer-events-none">
+        <div className="mx-auto w-full max-w-3xl px-4 md:px-10 pointer-events-auto">
+          <CommandInput
+            onSubmit={handleSend}
+            onStop={handleStop}
+            onVoiceStart={tts.cancel}
+            isLoading={isLoading}
+          />
+          <p className="mt-2 text-center font-mono text-[10px] tracking-wider text-neutral-600">
+            Enter envia · Shift+Enter quebra linha
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </section>
+    </main>
+  );
+}
+
+function Hero() {
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-3 pb-6 duration-700">
+      <h1 className="bg-gradient-to-b from-white to-neutral-500 bg-clip-text text-6xl font-bold tracking-tight text-transparent md:text-7xl">
+        ODIN
+      </h1>
+      <p className="mt-4 max-w-md text-balance text-neutral-300">
+        A versão externa do seu cérebro. Digite um comando abaixo para começar.
+      </p>
     </div>
   );
 }
