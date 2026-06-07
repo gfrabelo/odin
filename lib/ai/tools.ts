@@ -95,16 +95,23 @@ export const odinFunctionDeclarations: FunctionDeclaration[] = [
 type ToolResult = Record<string, unknown>;
 type ToolArgs = Record<string, unknown>;
 
+interface TavilyResult {
+  title?: string;
+  url?: string;
+  content?: string;
+}
+
 /**
- * webSearch — MOCK inicial.
- * TODO: trocar por uma Search API real (Brave / Serper / Tavily). Quando
- * `SEARCH_API_KEY` existir, plugar a chamada HTTP aqui e mapear pro mesmo formato.
+ * webSearch — busca web real via Tavily (feita pra agentes: trechos limpos +
+ * uma `answer` sintetizada). Sem `SEARCH_API_KEY` configurada, cai num mock.
+ * Para trocar de provedor (Brave/Serper), basta reescrever esta função.
  */
 async function webSearch(args: ToolArgs): Promise<ToolResult> {
   const query = String(args.query ?? "").trim();
   if (!query) return { error: "query vazia." };
 
-  if (!process.env.SEARCH_API_KEY) {
+  const apiKey = process.env.SEARCH_API_KEY;
+  if (!apiKey) {
     return {
       output: {
         note: "Resultado simulado (SEARCH_API_KEY não configurada — modo mock).",
@@ -114,18 +121,45 @@ async function webSearch(args: ToolArgs): Promise<ToolResult> {
             title: `Resultado de exemplo para "${query}"`,
             url: "https://example.com/odin-mock",
             snippet:
-              "Este é um resultado mockado. Configure SEARCH_API_KEY e a integração " +
-              "real em lib/ai/tools.ts para buscas de verdade.",
+              "Este é um resultado mockado. Configure SEARCH_API_KEY (Tavily) " +
+              "para buscas de verdade.",
           },
         ],
       },
     };
   }
 
-  // TODO: integração real, ex:
-  //   const res = await fetch("https://api.search.provider/...", { headers: { Authorization: ... } });
-  //   return { output: { query, results: mapResults(await res.json()) } };
-  return { output: { query, results: [] } };
+  const res = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query,
+      max_results: 5,
+      search_depth: "basic",
+      include_answer: true,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    return { error: `Tavily respondeu ${res.status}: ${text.slice(0, 200)}` };
+  }
+
+  const data = (await res.json()) as { answer?: string; results?: TavilyResult[] };
+  return {
+    output: {
+      query,
+      answer: data.answer ?? null, // resumo já sintetizado pelo Tavily
+      results: (data.results ?? []).map((r) => ({
+        title: r.title ?? null,
+        url: r.url ?? null,
+        snippet: r.content ?? null,
+      })),
+    },
+  };
 }
 
 async function readObsidianNote(args: ToolArgs): Promise<ToolResult> {

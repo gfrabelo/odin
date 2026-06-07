@@ -127,7 +127,7 @@ Detalhes:
 - **Tools (`lib/ai/tools.ts`):** `executeTool` é blindado (nunca lança; erro vira `{ error }`).
   - `searchSecondBrain(query)` — reusa `retrieveContext()` (RAG **híbrido**: injeção automática + busca dirigida).
   - `readObsidianNote(path)` — lê nota inteira via `lib/vault.ts` (guard de path-traversal + `HARD_EXCLUDE`).
-  - `webSearch(query)` — **mock** por enquanto; troca por Search API real quando houver `SEARCH_API_KEY`.
+  - `webSearch(query)` — busca web real via **Tavily** (`SEARCH_API_KEY`); sem a chave, cai num mock. Retorna `answer` (resumo) + results (title/url/snippet).
   - `getSurfForecast(latitude?, longitude?)` — Open-Meteo Marine + Weather (sem chave), default Peruíbe/SP (`-24.32 / -46.99`); retorna condições agora + amostra das próximas ~12h. Tom de surfista vem do system prompt.
 - **Por que `webSearch` não é o tool nativo do Gemini:** o Gemini API não permite misturar o `googleSearch` nativo com `functionDeclarations` na mesma chamada. Função custom mantém o loop unificado.
 
