@@ -52,16 +52,37 @@ export default function Cockpit() {
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
+        let lastIndex = 0;
+        const sentenceEndRegex = /(?:[^.!?\n]|\.(?=\d))+[.!?\n]+(?=\s|$)/;
 
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
           acc += decoder.decode(value, { stream: true });
           setStreaming(acc);
+
+          if (ttsEnabledRef.current) {
+            let remaining = acc.slice(lastIndex);
+            let match;
+            while ((match = remaining.match(sentenceEndRegex))) {
+              const sentence = match[0].trim();
+              lastIndex += match.index! + match[0].length;
+              if (sentence) {
+                tts.speak(sentence);
+              }
+              remaining = acc.slice(lastIndex);
+            }
+          }
         }
 
         setMessages([...history, { role: "assistant", content: acc }]);
-        if (ttsEnabledRef.current) tts.speak(acc); // Odin fala a resposta
+        
+        if (ttsEnabledRef.current) {
+          const remaining = acc.slice(lastIndex).trim();
+          if (remaining) {
+            tts.speak(remaining);
+          }
+        }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
           // Interrompido pelo usuário: preserva o que já foi gerado.
@@ -99,77 +120,66 @@ export default function Cockpit() {
   }, [tts]);
 
   return (
-    <main className="relative flex h-dvh flex-col overflow-hidden">
+    <main className="relative flex h-dvh w-screen flex-col overflow-hidden md:flex-row">
       {/* Camada -z-10: background puro (shader + spotlight + scrims) */}
       <OdinBackground />
 
-      {/* Camada z-0: cena 3D interativa do robô Spline.
-          Renderizada diretamente na página para receber eventos de mouse
-          nativamente — é assim que o "look at" funciona. */}
-      <div className="fixed inset-0 md:left-[18%]">
-        <SplineScene
-          scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
-          className="h-full w-full"
-        />
-      </div>
-
-      {/* Header — acima do Spline */}
-      <header className="z-10 flex items-center justify-between px-6 py-5 md:px-10">
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-sm font-semibold tracking-[0.4em] text-neutral-100">
-            ODIN
-          </span>
-          <span className="hidden text-[10px] uppercase tracking-[0.3em] text-neutral-500 sm:inline">
-            orquestrador de conhecimento
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          {tts.supported && (
-            <button
-              type="button"
-              onClick={toggleVoice}
-              aria-label={tts.enabled ? "Desativar voz do Odin" : "Ativar voz do Odin"}
-              className={cn(
-                "grid size-8 cursor-pointer place-items-center rounded-lg transition-all duration-200",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--odin-accent)]",
-                tts.enabled
-                  ? "bg-[var(--odin-accent)]/15 text-[var(--odin-accent)]"
-                  : "text-neutral-500 hover:text-neutral-300",
-                tts.speaking && "animate-pulse"
-              )}
-            >
-              {tts.enabled ? (
-                <Volume2 className="size-4" />
-              ) : (
-                <VolumeX className="size-4" />
-              )}
-            </button>
-          )}
-          <div className="flex items-center gap-2">
-            <span className="size-2 animate-pulse rounded-full bg-[var(--odin-accent)] shadow-[0_0_12px_var(--odin-accent)]" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-neutral-400">
-              online
+      {/* Coluna Esquerda: Console de Comando e Chat */}
+      <section className="glass relative z-10 flex h-full w-full flex-col border-t-0 border-b-0 border-l-0 rounded-none md:w-[45%] md:min-w-[420px] md:max-w-[550px] md:border-r">
+        {/* Header */}
+        <header className="flex items-center justify-between px-6 py-5">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-sm font-semibold tracking-[0.4em] text-neutral-100">
+              ODIN
+            </span>
+            <span className="hidden text-[10px] uppercase tracking-[0.3em] text-neutral-500 sm:inline">
+              orquestrador
             </span>
           </div>
-        </div>
-      </header>
-
-      {/* Área central: hero (vazio) ou conversa.
-          Scroll é full-bleed (barra na borda da tela); o conteúdo é
-          centralizado em max-w-3xl dentro do ResponseStream. */}
-      <section className="z-10 flex min-h-0 flex-1 flex-col pb-3 pointer-events-none">
-        {hasConversation ? (
-          <ResponseStream messages={messages} streaming={streaming} />
-        ) : (
-          <div className="mx-auto mt-auto w-full max-w-3xl px-4 md:px-10">
-            <Hero />
+          <div className="flex items-center gap-4">
+            {tts.supported && (
+              <button
+                type="button"
+                onClick={toggleVoice}
+                aria-label={tts.enabled ? "Desativar voz do Odin" : "Ativar voz do Odin"}
+                className={cn(
+                  "grid size-8 cursor-pointer place-items-center rounded-lg transition-all duration-200",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--odin-accent)]",
+                  tts.enabled
+                    ? "bg-[var(--odin-accent)]/15 text-[var(--odin-accent)]"
+                    : "text-neutral-500 hover:text-neutral-300",
+                  tts.speaking && "animate-pulse"
+                )}
+              >
+                {tts.enabled ? (
+                  <Volume2 className="size-4" />
+                ) : (
+                  <VolumeX className="size-4" />
+                )}
+              </button>
+            )}
+            <div className="flex items-center gap-2">
+              <span className="size-2 animate-pulse rounded-full bg-[var(--odin-accent)] shadow-[0_0_12px_var(--odin-accent)]" />
+              <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-neutral-400">
+                online
+              </span>
+            </div>
           </div>
-        )}
-      </section>
+        </header>
 
-      {/* Comando */}
-      <section className="z-10 pb-6 md:pb-8 pointer-events-none">
-        <div className="mx-auto w-full max-w-3xl px-4 md:px-10 pointer-events-auto">
+        {/* Área Central: Histórico do Chat ou Hero */}
+        <div className="flex min-h-0 flex-1 flex-col pb-3">
+          {hasConversation ? (
+            <ResponseStream messages={messages} streaming={streaming} />
+          ) : (
+            <div className="mx-auto mt-auto w-full px-6 pb-6">
+              <Hero />
+            </div>
+          )}
+        </div>
+
+        {/* Input de Comando */}
+        <div className="px-6 pb-6 md:pb-8">
           <CommandInput
             onSubmit={handleSend}
             onStop={handleStop}
@@ -181,6 +191,14 @@ export default function Cockpit() {
           </p>
         </div>
       </section>
+
+      {/* Coluna Direita: Holograma 3D do Robô */}
+      <section className="fixed inset-0 z-0 h-full w-full pointer-events-none md:pointer-events-auto md:relative md:inset-auto md:flex-1 md:h-full">
+        <SplineScene
+          scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+          className="h-full w-full"
+        />
+      </section>
     </main>
   );
 }
@@ -188,7 +206,7 @@ export default function Cockpit() {
 function Hero() {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-3 pb-6 duration-700">
-      <h1 className="bg-gradient-to-b from-white to-neutral-500 bg-clip-text text-6xl font-bold tracking-tight text-transparent md:text-7xl">
+      <h1 className="bg-gradient-to-b from-white to-neutral-500 bg-clip-text text-5xl font-bold tracking-tight text-transparent md:text-6xl">
         ODIN
       </h1>
       <p className="mt-4 max-w-md text-balance text-neutral-300">
