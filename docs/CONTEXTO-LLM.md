@@ -2,7 +2,7 @@
 
 > **Documento vivo.** Carregue este arquivo como contexto ao trabalhar no Odin com qualquer LLM.
 > Mantém o estado real do projeto: arquitetura, decisões, o que existe e o que vem.
-> Última atualização: camada RAG construída (aguardando configuração do Supabase pelo usuário).
+> Última atualização: **Function Calling (4 tools) + Glow Pulse + Modo Conversa Contínua + TTS OpenAI + retry**.
 
 ---
 
@@ -33,8 +33,10 @@
 | IA (chat) | `@google/genai` — modelo `gemini-2.5-flash` |
 | IA (embeddings) | `gemini-embedding-001` com `outputDimensionality: 768` (default do modelo é 3072) |
 | RAG / DB | `@supabase/supabase-js` + Postgres `pgvector` |
+| Tools (function calling) | `webSearch` (mock→API), `readObsidianNote`, `searchSecondBrain`, `getSurfForecast` (Open-Meteo) |
 | Scripts | `tsx` + `dotenv` |
-| Voz | Web Speech API nativa: `SpeechRecognition` (STT) + `SpeechSynthesis` (TTS), pt-BR. Sem deps. |
+| STT (escuta) | Web Speech API nativa (`SpeechRecognition`), pt-BR. Sem deps. Modo click-to-talk **ou** conversa contínua. |
+| TTS (voz) | **OpenAI** `/v1/audio/speech` (`tts-1`, voz `onyx`, `speed` 1.15) via rota `/api/tts`. Fila FIFO por frase + AnalyserNode p/ glow pulse. |
 | Fonte | Inter (sans) + Geist Mono (terminal) |
 
 > Nota: `@anthropic-ai/sdk` ainda consta nas deps (uso original com Claude). Hoje inativo; mantido pensando na orquestração multi-modelo futura.
@@ -44,34 +46,45 @@
 ```
 odin/
 ├── app/
-│   ├── page.tsx               # Cockpit (client): estado do chat, fetch+stream, AbortController
+│   ├── page.tsx               # Cockpit (client): chat, stream, AbortController, modo conversa, glow pulse
 │   ├── layout.tsx             # Root: fontes (Inter/Geist Mono), dark, metadata
 │   ├── globals.css            # Tailwind v4 @theme, tokens glass/accent, scrollbar, .odin-md
-│   └── api/chat/route.ts      # POST: consome streamOdinResponse → ReadableStream de texto
+│   └── api/
+│       ├── chat/route.ts       # POST: consome streamOdinResponse → ReadableStream de texto
+│       ├── tts/route.ts        # POST: texto → áudio (OpenAI TTS, voz onyx, speed configurável)
+│       ├── stats/route.ts      # GET: contagem de chunks vetoriais (HUD direito)
+│       └── sync/route.ts       # POST: dispara `npm run sync` (botão "Sincronizar Vault")
 ├── components/
 │   ├── interface/
 │   │   ├── OdinBackground.tsx  # Background fixo: WebGLShader + Spotlight + scrims (pointer-events-none)
-│   │   ├── CommandInput.tsx    # Input terminal/glass; botão envia↔parar; Lucide
-│   │   └── ResponseStream.tsx  # Conversa: scroll bottom-anchored + markdown nas respostas
+│   │   ├── CommandInput.tsx    # Input terminal/glass; envia↔parar; STT; modo conversa + barge-in
+│   │   ├── ResponseStream.tsx  # Conversa: scroll bottom-anchored + markdown nas respostas
+│   │   └── VoiceVisualizer.tsx # Glow pulse: anel `back` (atrás da cabeça) + halo `front`, via CSS var --p
 │   └── ui/
-│       ├── splite.tsx          # SplineScene (lazy + Suspense)
+│       ├── splite.tsx          # SplineScene (lazy + Suspense) — expõe onLoad(app)
 │       ├── spotlight.tsx       # Spotlight (aceternity, SVG)
 │       ├── web-gl-shader.tsx   # Shader de fundo (adicionado pelo usuário)
 │       └── card.tsx            # shadcn
 ├── lib/
 │   ├── ai/
 │   │   ├── client.ts           # getGemini() — singleton lazy (GEMINI_API_KEY)
-│   │   └── chat.ts             # streamOdinResponse() — RAG + Gemini streaming [PONTO DE EXTENSÃO]
-│   ├── prompts/odin.ts         # ODIN_SYSTEM_PROMPT (isolado, fácil de refinar)
+│   │   ├── chat.ts             # streamOdinResponse() — RAG + Gemini + LOOP de function calling + retry [PONTO DE EXTENSÃO]
+│   │   └── tools.ts            # odinFunctionDeclarations + executeTool() (webSearch, readObsidianNote, searchSecondBrain, getSurfForecast)
+│   ├── prompts/odin.ts         # ODIN_SYSTEM_PROMPT (identidade + uso das tools + tom de surfista)
 │   ├── rag/
 │   │   ├── supabase.ts         # getSupabase()/isSupabaseConfigured() — lazy, service role
-│   │   ├── embeddings.ts       # embedQuery()/embedDocuments() — Gemini text-embedding-004
+│   │   ├── embeddings.ts       # embedQuery()/embedDocuments() — gemini-embedding-001
 │   │   └── retrieve.ts         # retrieveContext() — embed query → match_documents (fail-safe)
+│   ├── voice/
+│   │   ├── use-speech-recognition.ts # STT (Web Speech); opção `continuous` (auto-restart) + onSpeechStart
+│   │   ├── use-speech-synthesis.ts   # TTS (OpenAI) fila FIFO + AudioContext/AnalyserNode → volumeRef (0..1)
+│   │   └── strip.ts            # stripMarkdownForSpeech()
+│   ├── vault.ts                # getVaultPath()/stripFrontmatter()/readNote() — acesso seguro ao vault (path-traversal guard)
 │   └── utils.ts                # cn()
-├── scripts/sync.ts             # Sync incremental wiki → Supabase (npm run sync)
+├── scripts/sync.ts             # Sync incremental wiki → Supabase (npm run sync) — usa lib/vault.ts
 ├── supabase/schema.sql         # pgvector + tabela documents + função match_documents
-├── types/index.ts              # Message, Role, ChatRequest
-└── .env.local.example          # GEMINI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, [VAULT_PATH, INGEST_DIRS]
+├── types/{index,speech}.d.ts   # Message/Role/ChatRequest; tipos da Web Speech API
+└── .env.local.example          # GEMINI_API_KEY, OPENAI_API_KEY, SUPABASE_*, [VAULT_PATH, INGEST_DIRS, SEARCH_API_KEY, OPENAI_TTS_*]
 ```
 
 ## 5. Fluxo de dados (ciclo de uma mensagem)
@@ -82,17 +95,22 @@ CommandInput.onSubmit
     → route.ts: streamOdinResponse(messages) → ReadableStream<Uint8Array> (text/plain)
       → chat.ts streamOdinResponse:
           1. pega a última msg do user
-          2. retrieveContext(query)  ← RAG (embed query → match_documents) [fail-safe → []]
+          2. retrieveContext(query)  ← RAG automático (embed → match_documents) [fail-safe → []]
           3. buildSystemInstruction(chunks)  ← injeta contexto no system
-          4. gemini.models.generateContentStream(...)  → yields chunk.text
+          4. LOOP de function calling (até MAX_TOOL_TURNS=5):
+               createStreamWithRetry(...)  → yields chunk.text + acumula chunk.functionCalls
+               se há functionCalls: executeTool() no Node → devolve functionResponse → repete o loop
+               senão: era a resposta final → fim
     → route enfileira cada chunk de texto
   → page lê response.body.getReader(), acumula em `streaming`, ao fim faz commit em `messages`
   → ResponseStream renderiza (markdown nas respostas do Odin), auto-scroll
+  → (se TTS ligado) page fatia o stream por frase → tts.speak() → fila FIFO → áudio + glow pulse
 ```
 
 Detalhes:
 - **Streaming:** texto puro (sem SSE). Mais simples; client só lê o ReadableStream.
-- **Stop:** `AbortController` no fetch. Em `AbortError`, preserva o texto parcial já gerado.
+- **Stop / Barge-in:** `AbortController` no fetch. Em `AbortError`, preserva o texto parcial. O barge-in (modo conversa) chama `tts.cancel()` + `abort()`.
+- **Retry:** `createStreamWithRetry` (em `chat.ts`) repete erros transitórios do Gemini (429/503/500, overloaded) com backoff exponencial 1s→2s→4s (teto 6s, 3 tentativas); se esgota, lança mensagem amigável de rate limit.
 - **Histórico:** estado React em `page.tsx` (sem persistência ainda; refresh limpa).
 
 ## 6. RAG — detalhes
@@ -103,15 +121,37 @@ Detalhes:
 - **Auto-sync:** git hook `post-commit` no vault (`segundo-cerebro/.git/hooks/post-commit`) — quando um commit mexe em `wiki/`, roda `npm run sync` no Odin automaticamente.
 - **Estado:** ✅ RAG VALIDADO E ATIVO. 62 chunks no Supabase. Retrieval testado ("visão 2031" → `visao-2031` sim. 0.786). Chat UI cita fontes `[n]`. Incremental + hook validados.
 
+## 6b. Function Calling (tools / ações)
+
+- **Loop no servidor (`chat.ts`):** o `config.tools` declara `odinFunctionDeclarations`. A cada turno o stream é consumido; se vierem `functionCall`, o servidor executa via `executeTool()`, devolve `functionResponse` (role `"user"`, `createPartFromFunctionResponse`) e repete (teto `MAX_TOOL_TURNS=5`). Contrato `Message[] → AsyncGenerator<string>` **inalterado** — rota/UI não sabem que houve ação.
+- **Tools (`lib/ai/tools.ts`):** `executeTool` é blindado (nunca lança; erro vira `{ error }`).
+  - `searchSecondBrain(query)` — reusa `retrieveContext()` (RAG **híbrido**: injeção automática + busca dirigida).
+  - `readObsidianNote(path)` — lê nota inteira via `lib/vault.ts` (guard de path-traversal + `HARD_EXCLUDE`).
+  - `webSearch(query)` — **mock** por enquanto; troca por Search API real quando houver `SEARCH_API_KEY`.
+  - `getSurfForecast(latitude?, longitude?)` — Open-Meteo Marine + Weather (sem chave), default Peruíbe/SP (`-24.32 / -46.99`); retorna condições agora + amostra das próximas ~12h. Tom de surfista vem do system prompt.
+- **Por que `webSearch` não é o tool nativo do Gemini:** o Gemini API não permite misturar o `googleSearch` nativo com `functionDeclarations` na mesma chamada. Função custom mantém o loop unificado.
+
+## 6c. Voz & Glow Pulse
+
+- **STT (`use-speech-recognition.ts`):** Web Speech, pt-BR, `interimResults`. Opção `continuous` → reabre o mic no `onend` (loop hands-free) com flag `wantStop` p/ desligar limpo; `onSpeechStart` p/ barge-in.
+- **TTS (`use-speech-synthesis.ts`):** OpenAI `/api/tts`, fila FIFO por frase (`new Audio()`). Cada áudio passa por `AudioContext`+`AnalyserNode`; um rAF calcula amplitude média (0..1, suavizada) em `volumeRef` — **sem setState por frame**. `initAudio()` é chamado num gesto do usuário (autoplay policy).
+- **Glow Pulse (`VoiceVisualizer.tsx`):** lê `volumeRef` num rAF próprio e escreve a CSS var `--p`; animação 100% CSS. Camada `back` (anel atrás da cabeça, renderizada antes do canvas Spline → oclusão = profundidade) + `front` (halo difuso). Opacidade ∝ volume → só aparece quando o Odin fala.
+- **Spline best-effort (`page.tsx`):** `onLoad` captura o `splineApp`; um rAF tenta animar `scale.y`/cor do objeto `SPLINE_FACE_OBJECT` ("Visor"); se não existir, no-op silencioso (o overlay cobre).
+- **Modo Conversa Contínua (botão headset):** liga TTS + escuta hands-free **meia-duplex** — o mic **desliga enquanto o Odin fala** e religa (com debounce de 350ms) quando ele cala. Evita eco no alto-falante. Barge-in fica como rede de segurança (só dispara se o mic estiver ativo, ex. com fones).
+
 ## 7. Variáveis de ambiente
 
 | Var | Uso |
 |---|---|
 | `GEMINI_API_KEY` | Chat + embeddings (Gemini). Obrigatória. |
+| `OPENAI_API_KEY` | TTS (voz do Odin) via `/api/tts`. Sem ela, a voz não funciona (chat segue normal). |
+| `OPENAI_TTS_VOICE` (opcional) | Voz da OpenAI (default `onyx`). |
+| `OPENAI_TTS_SPEED` (opcional) | Velocidade da fala 0.25–4.0 (default `1.15`). |
 | `SUPABASE_URL` | Projeto Supabase (`https://zvcuahmxipijphqhyfox.supabase.co`). |
 | `SUPABASE_SERVICE_ROLE_KEY` | Acesso server-side ao DB (RAG + ingestão). |
-| `VAULT_PATH` (opcional) | Caminho do vault (default `../segundo-cerebro`). |
+| `VAULT_PATH` (opcional) | Caminho do vault (default `../segundo-cerebro`). Usado pelo sync E pela tool `readObsidianNote`. |
 | `INGEST_DIRS` (opcional) | Pastas a indexar (default `wiki`). `it-lean-confidencial` sempre excluída. |
+| `SEARCH_API_KEY` (opcional) | Liga a busca web real em `webSearch`. Sem ela → mock. |
 
 ## 8. Harness / infra de desenvolvimento
 
@@ -126,7 +166,11 @@ Detalhes:
 - ✅ Scroll bottom-anchored + scrollbar estilizada.
 - ✅ Camada RAG construída e fail-safe (ativa sozinha quando Supabase é configurado).
 - ✅ RAG ativo: `npm run sync` incremental + auto-sync via git hook no commit do wiki.
-- ✅ Voz: STT (microfone → transcrição ao vivo → auto-envia na pausa) + TTS (Odin fala a resposta; toggle no header). `lib/voice/{use-speech-recognition,use-speech-synthesis,strip}.ts`, `types/speech.d.ts`. Click-to-talk (não contínuo); TTS é cancelada ao enviar novo comando e ao iniciar o mic.
+- ✅ Voz: STT (microfone → transcrição ao vivo → auto-envia na pausa) + TTS **OpenAI** (`onyx`, speed 1.15) com fila FIFO por frase. Toggle de voz + **botão headset** (modo conversa contínua meia-duplex) no header.
+- ✅ **Function Calling**: loop de tools no servidor com 4 ferramentas (`searchSecondBrain`, `readObsidianNote`, `webSearch` [mock], `getSurfForecast` [Open-Meteo]). `executeTool` blindado.
+- ✅ **Glow Pulse**: `VoiceVisualizer` pulsa no ritmo da voz (anel atrás da cabeça + halo frontal); Spline best-effort.
+- ✅ **Modo Conversa Contínua**: hands-free meia-duplex (sem eco) + barge-in (rede de segurança c/ fones).
+- ✅ **Retry**: backoff exponencial p/ erros transitórios do Gemini (429/503), com mensagem amigável de rate limit.
 
 ## 10. Roadmap (e como cada peça se pluga)
 
@@ -139,9 +183,10 @@ Detalhes:
 - Citações clicáveis → abrir a nota fonte.
 
 **Multimodal (caminho Jarvis) — todos se plugam no contrato existente:**
-- ✅ **Voz (entrada/saída):** feito (Web Speech API). Próximos refinamentos: modo conversa contínua (re-armar o mic após o Odin falar), voz premium via Gemini TTS, barge-in.
+- ✅ **Voz (entrada/saída):** feito. STT (Web Speech) + TTS (OpenAI), **modo conversa contínua** (meia-duplex) e **barge-in**. Próximo: voz premium / streaming de TTS.
+- ✅ **Ações (function calling):** feito (loop de tools em `chat.ts`). Próximas tools: `writeObsidianNote`, agenda/calendário, automações.
 - **Visão:** webcam/screen capture → frames como `parts` multimodais pro Gemini (já é multimodal). Estende `toGeminiContents` em `chat.ts`.
-- **Ações (function calling):** declarar tools no `generateContentStream` (config.tools) e tratar tool calls no loop — mesmo padrão de "harness". Ponto de plugue: `chat.ts`.
+- **Busca web real:** trocar o mock de `webSearch` por Search API (Brave/Serper/Tavily) quando `SEARCH_API_KEY` existir.
 
 **Orquestração multi-modelo:**
 - Roteador em `chat.ts` que escolhe Gemini/Claude/GPT por intenção. O contrato `Message[] → AsyncGenerator<string>` não muda; rota e UI ficam intactas.

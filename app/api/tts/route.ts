@@ -16,6 +16,8 @@ export async function POST(req: Request) {
     }
 
     const voice = process.env.OPENAI_TTS_VOICE || "onyx";
+    // Velocidade da fala (0.25–4.0). 1.15 deixa o Odin mais fluido sem distorcer.
+    const speed = Number(process.env.OPENAI_TTS_SPEED) || 1.15;
 
     const response = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
@@ -27,6 +29,7 @@ export async function POST(req: Request) {
         model: "tts-1",
         input: text,
         voice: voice,
+        speed: speed,
       }),
     });
 

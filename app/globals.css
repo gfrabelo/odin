@@ -315,3 +315,12 @@ a, button, [role="button"], label[for], select, summary {
   padding: 0.4em 0.6em;
   text-align: left;
 }
+
+/* Ocultar barra de rolagem mantendo funcionalidade */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

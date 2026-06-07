@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowUp, ChevronRight, Mic, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSpeechRecognition } from "@/lib/voice/use-speech-recognition";
@@ -13,6 +13,12 @@ interface CommandInputProps {
   onVoiceStart?: () => void;
   /** True enquanto o Odin está respondendo. */
   isLoading?: boolean;
+  /** Modo conversa contínua (hands-free): mic auto-reinicia entre os turnos. */
+  conversationMode?: boolean;
+  /** True enquanto o Odin está FALANDO (TTS) — habilita o barge-in. */
+  odinSpeaking?: boolean;
+  /** Barge-in: usuário começou a falar enquanto o Odin falava → corta tudo. */
+  onBargeIn?: () => void;
 }
 
 /**
@@ -25,6 +31,9 @@ export function CommandInput({
   onStop,
   onVoiceStart,
   isLoading,
+  conversationMode = false,
+  odinSpeaking = false,
+  onBargeIn,
 }: CommandInputProps) {
   const [value, setValue] = useState("");
   const baseRef = useRef(""); // texto digitado antes de começar a falar
@@ -39,6 +48,7 @@ export function CommandInput({
 
   const { supported: micSupported, listening, start, stop } =
     useSpeechRecognition({
+      continuous: conversationMode,
       onInterim: (text) => {
         const base = baseRef.current.trim();
         setValue((base ? base + " " : "") + text);
@@ -47,7 +57,27 @@ export function CommandInput({
         const base = baseRef.current.trim();
         send((base ? base + " " : "") + text);
       },
+      onSpeechStart: () => {
+        // Barge-in só com fones: se odinSpeaking, corta. No modo meia-duplex
+        // (padrão) o mic está desligado durante a fala, então isto não dispara
+        // por eco — fica como rede de segurança caso o mic ainda esteja ativo.
+        if (odinSpeaking) onBargeIn?.();
+      },
     });
+
+  // Modo conversa hands-free MEIA-DUPLEX (evita eco no alto-falante):
+  // o mic fica desligado enquanto o Odin FALA e religa sozinho quando ele cala.
+  // O delay ao religar serve de debounce contra o flicker de `speaking` entre frases.
+  useEffect(() => {
+    if (!micSupported) return;
+    if (!conversationMode || odinSpeaking) {
+      stop(); // não ouvir enquanto o Odin fala → sem eco
+      return;
+    }
+    baseRef.current = "";
+    const t = setTimeout(() => start(), 350);
+    return () => clearTimeout(t);
+  }, [conversationMode, odinSpeaking, micSupported, start, stop]);
 
   function toggleMic() {
     if (listening) {
@@ -69,9 +99,11 @@ export function CommandInput({
   const canSend = !!value.trim() && !isLoading;
   const placeholder = isLoading
     ? "Odin está respondendo…"
-    : listening
-      ? "Ouvindo…"
-      : "Fale com o Odin…";
+    : conversationMode
+      ? "Modo conversa ativo — pode falar 🎧"
+      : listening
+        ? "Ouvindo…"
+        : "Fale com o Odin…";
 
   return (
     <div

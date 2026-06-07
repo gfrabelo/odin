@@ -69,6 +69,27 @@ export const odinFunctionDeclarations: FunctionDeclaration[] = [
       required: ["query"],
     },
   },
+  {
+    name: "getSurfForecast",
+    description:
+      "Condições de surf e tempo em tempo real para uma praia (default: Peruíbe/SP). " +
+      "Retorna agora (altura/período/direção de onda e swell, vento, temperatura) e um " +
+      "resumo das próximas ~12h. Use quando o Gabriel perguntar sobre surf, mar, ondas, " +
+      "swell, vento ou se 'tá bom pra surfar'.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        latitude: {
+          type: Type.NUMBER,
+          description: "Latitude da praia. Omita para usar Peruíbe/SP.",
+        },
+        longitude: {
+          type: Type.NUMBER,
+          description: "Longitude da praia. Omita para usar Peruíbe/SP.",
+        },
+      },
+    },
+  },
 ];
 
 type ToolResult = Record<string, unknown>;
@@ -137,10 +158,115 @@ async function searchSecondBrain(args: ToolArgs): Promise<ToolResult> {
   };
 }
 
+// Peruíbe/SP — ponto de surf padrão do Gabriel.
+const PERUIBE = { latitude: -24.32, longitude: -46.99, spot: "Peruíbe/SP" };
+const TZ = "America/Sao_Paulo";
+
+/** Graus meteorológicos → ponto cardeal (de onde vem). */
+function degToCompass(deg: number | undefined): string | null {
+  if (typeof deg !== "number") return null;
+  const dirs = [
+    "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+    "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+  ];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
+
+async function fetchJson(url: string): Promise<Record<string, unknown>> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Open-Meteo respondeu ${res.status}`);
+  return res.json();
+}
+
+/** Amostra o array `hourly` a cada `step` horas, a partir de agora. */
+function sampleHours(
+  hourly: Record<string, unknown> | undefined,
+  keys: string[],
+  step = 3,
+  count = 4
+): Array<Record<string, unknown>> {
+  const times = (hourly?.time as string[]) ?? [];
+  if (times.length === 0) return [];
+  const out: Array<Record<string, unknown>> = [];
+  for (let i = 0; i < times.length && out.length < count; i += step) {
+    const sample: Record<string, unknown> = { time: times[i] };
+    for (const k of keys) {
+      const arr = hourly?.[k] as number[] | undefined;
+      if (arr) sample[k] = arr[i];
+    }
+    out.push(sample);
+  }
+  return out;
+}
+
+async function getSurfForecast(args: ToolArgs): Promise<ToolResult> {
+  const lat = typeof args.latitude === "number" ? args.latitude : PERUIBE.latitude;
+  const lon = typeof args.longitude === "number" ? args.longitude : PERUIBE.longitude;
+  const isPeruibe = lat === PERUIBE.latitude && lon === PERUIBE.longitude;
+
+  const marineUrl =
+    `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}` +
+    `&current=wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_period,swell_wave_direction` +
+    `&hourly=wave_height,wave_period,swell_wave_height,swell_wave_period&forecast_hours=12&timezone=${TZ}`;
+  const weatherUrl =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
+    `&hourly=wind_speed_10m,wind_direction_10m&forecast_hours=12&wind_speed_unit=kmh&timezone=${TZ}`;
+
+  const [marine, weather] = await Promise.all([
+    fetchJson(marineUrl),
+    fetchJson(weatherUrl),
+  ]);
+
+  const mc = (marine.current as Record<string, number>) ?? {};
+  const wc = (weather.current as Record<string, number>) ?? {};
+
+  const now = {
+    horario: mc.time ?? wc.time ?? null,
+    onda_altura_m: mc.wave_height ?? null,
+    onda_periodo_s: mc.wave_period ?? null,
+    onda_direcao: degToCompass(mc.wave_direction),
+    swell_altura_m: mc.swell_wave_height ?? null,
+    swell_periodo_s: mc.swell_wave_period ?? null,
+    swell_direcao: degToCompass(mc.swell_wave_direction),
+    vento_kmh: wc.wind_speed_10m ?? null,
+    vento_rajada_kmh: wc.wind_gusts_10m ?? null,
+    vento_direcao: degToCompass(wc.wind_direction_10m),
+    temperatura_c: wc.temperature_2m ?? null,
+  };
+
+  const next_hours = {
+    mar: sampleHours(
+      marine.hourly as Record<string, unknown>,
+      ["wave_height", "wave_period", "swell_wave_height", "swell_wave_period"]
+    ),
+    vento: sampleHours(
+      weather.hourly as Record<string, unknown>,
+      ["wind_speed_10m", "wind_direction_10m"]
+    ),
+  };
+
+  return {
+    output: {
+      spot: isPeruibe ? PERUIBE.spot : `lat ${lat}, lon ${lon}`,
+      now,
+      next_hours,
+      units: {
+        altura: "m",
+        periodo: "s",
+        vento: "km/h",
+        temperatura: "°C",
+        direcao: "ponto cardeal (de onde vem)",
+      },
+    },
+  };
+}
+
 const toolExecutors: Record<string, (args: ToolArgs) => Promise<ToolResult>> = {
   webSearch,
   readObsidianNote,
   searchSecondBrain,
+  getSurfForecast,
 };
 
 /**
