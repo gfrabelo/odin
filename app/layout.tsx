@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-// Inter: sans cinematográfica/técnica, premium — recomendada pela skill
+// Inter: sans cinematográfica/técnica, premium - recomendada pela skill
 // ui-ux-pro-max para AI dashboards dark.
 const inter = Inter({
   variable: "--font-sans",
@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Odin — Orquestrador de Conhecimento",
+  title: "Odin - Orquestrador de Conhecimento",
   description: "A versão externa do cérebro de Gabriel Rabelo.",
 };
 

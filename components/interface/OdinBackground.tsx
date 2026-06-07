@@ -5,7 +5,7 @@ import { WebGLShader } from "@/components/ui/web-gl-shader";
 
 /**
  * Background puramente visual do cockpit: shader WebGL + spotlight + scrims.
- * Nenhum elemento interativo aqui — tudo é pointer-events-none.
+ * Nenhum elemento interativo aqui - tudo é pointer-events-none.
  * A cena 3D do Spline é renderizada separadamente em page.tsx para
  * garantir que os eventos de mouse (olhar do robô) funcionem corretamente.
  */

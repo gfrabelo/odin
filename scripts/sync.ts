@@ -20,7 +20,7 @@ import { HARD_EXCLUDE, getVaultPath, stripFrontmatter } from "../lib/vault";
 
 config({ path: ".env.local" });
 
-// getVaultPath() é chamado APÓS config() — assim respeita um VAULT_PATH custom no .env.local.
+// getVaultPath() é chamado APÓS config() - assim respeita um VAULT_PATH custom no .env.local.
 const VAULT_PATH = getVaultPath();
 const INCLUDE_DIRS = (process.env.INGEST_DIRS ?? "wiki")
   .split(",")
@@ -144,7 +144,7 @@ async function main() {
   }
 
   if (toUpsert.length === 0 && toDelete.length === 0) {
-    console.log("✓ Já está em dia — nada a sincronizar.");
+    console.log("✓ Já está em dia - nada a sincronizar.");
   } else {
     console.log("✓ Sync concluído.");
   }

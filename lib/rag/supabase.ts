@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // Cliente Supabase (singleton lazy, só servidor).
-// Usa a service role key — acesso total. NUNCA importe em componentes client.
+// Usa a service role key - acesso total. NUNCA importe em componentes client.
 let client: SupabaseClient | null = null;
 
 export function isSupabaseConfigured(): boolean {

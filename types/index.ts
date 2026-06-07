@@ -1,5 +1,5 @@
 // Tipos centrais do Odin.
-// Mantidos minimalistas no Sprint 1 — vão crescer quando entrarem
+// Mantidos minimalistas no Sprint 1 - vão crescer quando entrarem
 // orquestrador multi-modelo, RAG e metadados de skills.
 
 export type Role = "user" | "assistant";

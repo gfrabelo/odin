@@ -15,7 +15,7 @@ import type { Application } from "@splinetool/runtime";
 
 /**
  * Nome do objeto no robô Spline cujo material/escala reage à voz (glow pulse).
- * A cena atual pode não expor um objeto com este nome — neste caso a manipulação
+ * A cena atual pode não expor um objeto com este nome - neste caso a manipulação
  * é um no-op silencioso e o <VoiceVisualizer/> cobre o efeito. Ajuste depois de
  * inspecionar os nomes dos objetos da cena.
  */
@@ -291,7 +291,7 @@ export default function Cockpit() {
               type="button"
               onClick={toggleConversation}
               aria-label={conversationMode ? "Sair do modo conversa" : "Entrar no modo conversa (hands-free)"}
-              title={conversationMode ? "Modo conversa ativo — use fones" : "Modo conversa contínua (hands-free)"}
+              title={conversationMode ? "Modo conversa ativo - use fones" : "Modo conversa contínua (hands-free)"}
               className={cn(
                 "grid size-8 cursor-pointer place-items-center rounded-lg transition-all duration-200",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--odin-accent)]",

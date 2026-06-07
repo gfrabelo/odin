@@ -16,7 +16,7 @@ interface ResponseStreamProps {
 /**
  * Conversa sobreposta ao 3D. Bolhas em vidro, markdown nas respostas do Odin.
  * Scroll próprio bottom-anchored: mensagens curtas ficam ancoradas embaixo
- * (perto do input); quando passam da altura, rolam — sempre seguindo o fim.
+ * (perto do input); quando passam da altura, rolam - sempre seguindo o fim.
  */
 export function ResponseStream({ messages, streaming, isLoading }: ResponseStreamProps) {
   const scrollRef = useRef<HTMLDivElement>(null);

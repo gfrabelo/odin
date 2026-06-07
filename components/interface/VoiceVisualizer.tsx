@@ -3,11 +3,11 @@
 import { useEffect, useRef, type CSSProperties, type RefObject } from "react";
 
 /**
- * Glow Pulse — overlay neon que pulsa no ritmo da voz do Odin.
+ * Glow Pulse - overlay neon que pulsa no ritmo da voz do Odin.
  *
  * Caminho CONFIÁVEL da sincronização visual (independe dos objetos internos da
  * cena Spline). Lê `volumeRef.current` (0..1) num rAF próprio e escreve numa CSS
- * var `--p`; toda a animação é CSS via `calc()` — zero re-render do React.
+ * var `--p`; toda a animação é CSS via `calc()` - zero re-render do React.
  *
  * Duas camadas, ambas posicionadas DENTRO da camada do robô (absolute inset-0):
  *  - `back`:  anel nítido na altura da CABEÇA, renderizado ANTES do canvas Spline
@@ -58,7 +58,7 @@ export function VoiceVisualizer({
         style={{ top: topOffset, "--p": 0 } as CSSProperties}
       >
         <div className="relative -translate-y-1/2">
-          {/* Disco de brilho — invisível em silêncio (opacidade ∝ volume). */}
+          {/* Disco de brilho - invisível em silêncio (opacidade ∝ volume). */}
           <div
             className="aspect-square w-[34vh] max-w-[420px] rounded-full"
             style={{
@@ -70,7 +70,7 @@ export function VoiceVisualizer({
               transition: "opacity 90ms linear",
             }}
           />
-          {/* Anel definido — invisível em silêncio (opacidade ∝ volume). */}
+          {/* Anel definido - invisível em silêncio (opacidade ∝ volume). */}
           <div
             className="absolute inset-0 m-auto aspect-square w-[34vh] max-w-[420px] rounded-full border-2"
             style={{

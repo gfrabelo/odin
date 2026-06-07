@@ -15,7 +15,7 @@ import { executeTool, odinFunctionDeclarations } from "./tools";
  */
 const ODIN_MODEL = "gemini-2.5-flash";
 
-/** Teto de rodadas do loop de tools — evita laço infinito de function calling. */
+/** Teto de rodadas do loop de tools - evita laço infinito de function calling. */
 const MAX_TOOL_TURNS = 5;
 
 /** Retry: tentativas e backoff (curto, pra não travar a UX) p/ erros transitórios. */
@@ -110,7 +110,7 @@ ${context}`;
  *
  * Hoje, por baixo: RAG automático sobre o vault (híbrido) + Gemini com
  * FUNCTION CALLING. Quando o Gemini decide chamar uma ferramenta, o loop abaixo
- * a executa localmente no Node e devolve o resultado pro modelo continuar — tudo
+ * a executa localmente no Node e devolve o resultado pro modelo continuar - tudo
  * sem a rota nem a UI saberem que houve uma ação no meio do caminho.
  */
 async function* streamOpenAIResponse(
@@ -187,7 +187,7 @@ async function* streamOpenAIResponse(
  *
  * Hoje, por baixo: RAG automático sobre o vault (híbrido) + Gemini com
  * FUNCTION CALLING. Quando o Gemini decide chamar uma ferramenta, o loop abaixo
- * a executa localmente no Node e devolve o resultado pro modelo continuar — tudo
+ * a executa localmente no Node e devolve o resultado pro modelo continuar - tudo
  * sem a rota nem a UI saberem que houve uma ação no meio do caminho.
  *
  * Caso o Gemini sofra erro ou rate-limit, o sistema reverte para OpenAI de forma transparente.

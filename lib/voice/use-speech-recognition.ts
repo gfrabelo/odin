@@ -80,7 +80,7 @@ export function useSpeechRecognition({
           setListening(true);
           return;
         } catch {
-          // start() pode lançar se ainda não soltou — cai pro estado parado.
+          // start() pode lançar se ainda não soltou - cai pro estado parado.
         }
       }
       setListening(false);
@@ -106,7 +106,7 @@ export function useSpeechRecognition({
       rec.start();
       setListening(true);
     } catch {
-      // start() lança se já estiver ativo — ignora.
+      // start() lança se já estiver ativo - ignora.
     }
   }, []);
 

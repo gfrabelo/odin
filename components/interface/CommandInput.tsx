@@ -15,7 +15,7 @@ interface CommandInputProps {
   isLoading?: boolean;
   /** Modo conversa contínua (hands-free): mic auto-reinicia entre os turnos. */
   conversationMode?: boolean;
-  /** True enquanto o Odin está FALANDO (TTS) — habilita o barge-in. */
+  /** True enquanto o Odin está FALANDO (TTS) - habilita o barge-in. */
   odinSpeaking?: boolean;
   /** Barge-in: usuário começou a falar enquanto o Odin falava → corta tudo. */
   onBargeIn?: () => void;
@@ -60,7 +60,7 @@ export function CommandInput({
       onSpeechStart: () => {
         // Barge-in só com fones: se odinSpeaking, corta. No modo meia-duplex
         // (padrão) o mic está desligado durante a fala, então isto não dispara
-        // por eco — fica como rede de segurança caso o mic ainda esteja ativo.
+        // por eco - fica como rede de segurança caso o mic ainda esteja ativo.
         if (odinSpeaking) onBargeIn?.();
       },
     });
@@ -100,7 +100,7 @@ export function CommandInput({
   const placeholder = isLoading
     ? "Odin está respondendo…"
     : conversationMode
-      ? "Modo conversa ativo — pode falar 🎧"
+      ? "Modo conversa ativo - pode falar 🎧"
       : listening
         ? "Ouvindo…"
         : "Fale com o Odin…";

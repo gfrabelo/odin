@@ -1,4 +1,4 @@
--- Odin RAG — schema pgvector
+-- Odin RAG - schema pgvector
 -- Rode no Supabase: Dashboard → SQL Editor → New query → cole e Run.
 -- (Ou eu rodo via Supabase MCP quando estiver autenticado.)
 

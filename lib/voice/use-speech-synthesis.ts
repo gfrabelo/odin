@@ -9,7 +9,7 @@ import { stripMarkdownForSpeech } from "./strip";
  *
  * GLOW PULSE: cada áudio da fila é roteado por um AnalyserNode (Web Audio). Um
  * loop de rAF calcula a amplitude média (0..1, suavizada) e a grava em `volumeRef`
- * — exposto para a UI animar o robô/overlay SEM re-render por frame.
+ * - exposto para a UI animar o robô/overlay SEM re-render por frame.
  */
 export function useSpeechSynthesis(lang = "pt-BR") {
   const [supported, setSupported] = useState(false);

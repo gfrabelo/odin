@@ -84,7 +84,7 @@
 }
 
 .dark {
-  /* Cockpit do Odin — preto azulado profundo */
+  /* Cockpit do Odin - preto azulado profundo */
   --background: #0a0e27;
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -182,7 +182,7 @@ a, button, [role="button"], label[for], select, summary {
 
 /* ── Odin: design tokens do cockpit (Spatial UI / glassmorphism) ─ */
 :root {
-  /* Accent "arc-reactor" — ciano elétrico. */
+  /* Accent "arc-reactor" - ciano elétrico. */
   --odin-accent: #38bdf8;
   --odin-accent-soft: rgba(56, 189, 248, 0.16);
   /* Superfícies de vidro sobre o 3D. */

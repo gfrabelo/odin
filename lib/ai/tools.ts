@@ -4,7 +4,7 @@
  * Duas metades, mantidas lado a lado de propósito:
  *  - `odinFunctionDeclarations`: o CONTRATO que o Gemini lê para decidir SE/QUAL
  *    ferramenta chamar. A `description` é o que mais importa para a decisão.
- *  - `executeTool`: a EXECUÇÃO real no Node. Nunca lança — qualquer erro vira
+ *  - `executeTool`: a EXECUÇÃO real no Node. Nunca lança - qualquer erro vira
  *    `{ error }` para o modelo se recuperar e seguir o stream.
  *
  * Todas as tools vivem no mesmo loop de resolução (ver `lib/ai/chat.ts`). Por isso
@@ -102,7 +102,7 @@ interface TavilyResult {
 }
 
 /**
- * webSearch — busca web real via Tavily (feita pra agentes: trechos limpos +
+ * webSearch - busca web real via Tavily (feita pra agentes: trechos limpos +
  * uma `answer` sintetizada). Sem `SEARCH_API_KEY` configurada, cai num mock.
  * Para trocar de provedor (Brave/Serper), basta reescrever esta função.
  */
@@ -114,7 +114,7 @@ async function webSearch(args: ToolArgs): Promise<ToolResult> {
   if (!apiKey) {
     return {
       output: {
-        note: "Resultado simulado (SEARCH_API_KEY não configurada — modo mock).",
+        note: "Resultado simulado (SEARCH_API_KEY não configurada - modo mock).",
         query,
         results: [
           {
@@ -192,7 +192,7 @@ async function searchSecondBrain(args: ToolArgs): Promise<ToolResult> {
   };
 }
 
-// Peruíbe/SP — ponto de surf padrão do Gabriel.
+// Peruíbe/SP - ponto de surf padrão do Gabriel.
 const PERUIBE = { latitude: -24.32, longitude: -46.99, spot: "Peruíbe/SP" };
 const TZ = "America/Sao_Paulo";
 
@@ -304,7 +304,7 @@ const toolExecutors: Record<string, (args: ToolArgs) => Promise<ToolResult>> = {
 };
 
 /**
- * Executa uma tool pelo nome. Blindado: nunca lança — erro vira `{ error }` para
+ * Executa uma tool pelo nome. Blindado: nunca lança - erro vira `{ error }` para
  * o Gemini continuar o turno em vez de derrubar o stream.
  */
 export async function executeTool(

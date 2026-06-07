@@ -1,9 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 
 // Cliente Google Gemini (singleton lazy).
-// Construído só na primeira chamada — assim a GEMINI_API_KEY é lida em runtime
+// Construído só na primeira chamada - assim a GEMINI_API_KEY é lida em runtime
 // (não no build) e não polui o build com avisos de key ausente.
-// Só roda no servidor — nunca importe isto em componentes client.
+// Só roda no servidor - nunca importe isto em componentes client.
 let client: GoogleGenAI | null = null;
 
 export function getGemini(): GoogleGenAI {

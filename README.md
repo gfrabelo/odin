@@ -1,4 +1,4 @@
-# ⚡ Odin — O Cockpit de IA & Segundo Cérebro do Futuro 🤖
+# ⚡ Odin - O Cockpit de IA & Segundo Cérebro do Futuro 🤖
 
 O **Odin** é um assistente de inteligência artificial pessoal projetado para funcionar como um orquestrador de conhecimento e um segundo cérebro externo. Ele une uma interface visual altamente imersiva e futurista de "cockpit" com uma camada avançada de **RAG (Retrieval-Augmented Generation)** conectada diretamente a um vault do Obsidian.
 
@@ -26,16 +26,16 @@ O Odin lê e indexa as suas notas pessoais armazenadas em um vault do Obsidian e
 ### 2. Conversação por Voz (STT & TTS) 🎙️
 * **Speech-to-Text (STT):** O Odin transcreve sua voz ao vivo através do navegador (Web Speech API) e envia o comando automaticamente quando você faz uma pausa natural.
 * **Text-to-Speech (TTS):** O Odin lê as respostas com voz natural via **OpenAI TTS** (voz `onyx`, velocidade ajustável), em fila por frase para começar a falar enquanto o resto ainda é gerado.
-* **Modo Conversa Contínua (Hands-Free):** Botão de headset que mantém o microfone ativo entre os turnos — você fala, o Odin responde, e o mic religa sozinho, sem clicar. Funciona em **meia-duplex** (mic pausa enquanto o Odin fala) para evitar eco no alto-falante.
+* **Modo Conversa Contínua (Hands-Free):** Botão de headset que mantém o microfone ativo entre os turnos - você fala, o Odin responde, e o mic religa sozinho, sem clicar. Funciona em **meia-duplex** (mic pausa enquanto o Odin fala) para evitar eco no alto-falante.
 * **Glow Pulse (Lip-Sync Visual):** Um anel neon pulsa atrás da cabeça do robô no ritmo exato da voz do Odin, sincronizado via Web Audio (`AnalyserNode`).
 * **Cancelamento Inteligente / Barge-in:** O áudio é interrompido imediatamente ao iniciar um novo comando, desativar a voz, ou (com fones) ao começar a falar por cima do Odin.
 
 ### 3. Ações & Function Calling 🛠️
-O Odin não é só um chatbot passivo — ele executa ações através de um loop de ferramentas no servidor:
+O Odin não é só um chatbot passivo - ele executa ações através de um loop de ferramentas no servidor:
 * **`searchSecondBrain`:** busca semântica dirigida no vault (além do RAG automático).
 * **`readObsidianNote`:** lê uma nota inteira do Obsidian (com guard de segurança contra path-traversal).
 * **`webSearch`:** busca na web (mock por padrão; pronto para plugar uma Search API real).
-* **`getSurfForecast`:** condições de surf e tempo em tempo real para Peruíbe/SP via **Open-Meteo** (Marine + Weather, sem chave) — o Odin comenta ondas, período, swell e vento com tom de surfista.
+* **`getSurfForecast`:** condições de surf e tempo em tempo real para Peruíbe/SP via **Open-Meteo** (Marine + Weather, sem chave) - o Odin comenta ondas, período, swell e vento com tom de surfista.
 
 ### 4. Engenharia de Chat Robusta & Agnóstica ⚡
 * **Provider Isolado:** A lógica da IA fica encapsulada atrás de um contrato estável de streaming. O Odin hoje utiliza o SDK `@google/genai` (modelo `gemini-2.5-flash`), mas o core do app é agnóstico e pronto para multi-modelos (como Claude ou GPT).

@@ -18,7 +18,7 @@ interface MatchRow {
  * Recupera trechos relevantes do segundo cérebro para uma query.
  *
  * FAIL-SAFE: se o Supabase não estiver configurado, a query estiver vazia,
- * ou ocorrer qualquer erro, devolve [] — o Odin responde sem RAG e o chat
+ * ou ocorrer qualquer erro, devolve [] - o Odin responde sem RAG e o chat
  * nunca quebra. O RAG "se liga" sozinho assim que o Supabase é configurado.
  */
 export async function retrieveContext(
