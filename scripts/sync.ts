@@ -16,15 +16,16 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep, basename } from "node:path";
 import { embedDocuments } from "../lib/rag/embeddings";
 import { getSupabase } from "../lib/rag/supabase";
+import { HARD_EXCLUDE, getVaultPath, stripFrontmatter } from "../lib/vault";
 
 config({ path: ".env.local" });
 
-const VAULT_PATH = process.env.VAULT_PATH ?? join("..", "segundo-cerebro");
+// getVaultPath() é chamado APÓS config() — assim respeita um VAULT_PATH custom no .env.local.
+const VAULT_PATH = getVaultPath();
 const INCLUDE_DIRS = (process.env.INGEST_DIRS ?? "wiki")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
-const HARD_EXCLUDE = ["it-lean-confidencial"];
 const CHUNK_SIZE = 1200;
 const CHUNK_OVERLAP = 150;
 
@@ -38,14 +39,6 @@ function walk(dir: string): string[] {
     else if (name.endsWith(".md")) out.push(full);
   }
   return out;
-}
-
-function stripFrontmatter(text: string): string {
-  if (text.startsWith("---")) {
-    const end = text.indexOf("\n---", 3);
-    if (end !== -1) return text.slice(end + 4);
-  }
-  return text;
 }
 
 function chunkText(text: string): string[] {

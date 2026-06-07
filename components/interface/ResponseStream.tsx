@@ -10,6 +10,7 @@ interface ResponseStreamProps {
   messages: Message[];
   /** Texto parcial do assistant chegando em tempo real (vazio quando ocioso). */
   streaming: string;
+  isLoading?: boolean;
 }
 
 /**
@@ -17,7 +18,7 @@ interface ResponseStreamProps {
  * Scroll próprio bottom-anchored: mensagens curtas ficam ancoradas embaixo
  * (perto do input); quando passam da altura, rolam — sempre seguindo o fim.
  */
-export function ResponseStream({ messages, streaming }: ResponseStreamProps) {
+export function ResponseStream({ messages, streaming, isLoading }: ResponseStreamProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Segue o fim a cada token/mensagem. scrollTop = scrollHeight é o método
@@ -25,7 +26,7 @@ export function ResponseStream({ messages, streaming }: ResponseStreamProps) {
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, streaming]);
+  }, [messages, streaming, isLoading]);
 
   return (
     <div
@@ -37,6 +38,10 @@ export function ResponseStream({ messages, streaming }: ResponseStreamProps) {
           <Bubble key={i} role={m.role} content={m.content} />
         ))}
 
+        {isLoading && !streaming && (
+          <Bubble role="assistant" content="" thinking />
+        )}
+
         {streaming && <Bubble role="assistant" content={streaming} streaming />}
       </div>
     </div>
@@ -47,10 +52,12 @@ function Bubble({
   role,
   content,
   streaming,
+  thinking,
 }: {
   role: Message["role"];
   content: string;
   streaming?: boolean;
+  thinking?: boolean;
 }) {
   const isUser = role === "user";
   return (
@@ -76,14 +83,20 @@ function Bubble({
             : "glass text-neutral-100"
         )}
       >
-        {isUser ? (
+        {thinking ? (
+          <div className="flex items-center gap-1.5 py-1 px-1">
+            <span className="size-2 animate-bounce rounded-full bg-[var(--odin-accent)] [animation-delay:-0.3s]" />
+            <span className="size-2 animate-bounce rounded-full bg-[var(--odin-accent)] [animation-delay:-0.15s]" />
+            <span className="size-2 animate-bounce rounded-full bg-[var(--odin-accent)]" />
+          </div>
+        ) : isUser ? (
           content
         ) : (
           <div className="odin-md">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
           </div>
         )}
-        {streaming && (
+        {streaming && !thinking && (
           <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 animate-pulse bg-[var(--odin-accent)]" />
         )}
       </div>

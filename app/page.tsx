@@ -6,9 +6,19 @@ import { OdinBackground } from "@/components/interface/OdinBackground";
 import { SplineScene } from "@/components/ui/splite";
 import { CommandInput } from "@/components/interface/CommandInput";
 import { ResponseStream } from "@/components/interface/ResponseStream";
+import { VoiceVisualizer } from "@/components/interface/VoiceVisualizer";
 import { useSpeechSynthesis } from "@/lib/voice/use-speech-synthesis";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types";
+import type { Application } from "@splinetool/runtime";
+
+/**
+ * Nome do objeto no robô Spline cujo material/escala reage à voz (glow pulse).
+ * A cena atual pode não expor um objeto com este nome — neste caso a manipulação
+ * é um no-op silencioso e o <VoiceVisualizer/> cobre o efeito. Ajuste depois de
+ * inspecionar os nomes dos objetos da cena.
+ */
+const SPLINE_FACE_OBJECT = "Visor";
 
 export default function Cockpit() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -21,6 +31,45 @@ export default function Cockpit() {
   const tts = useSpeechSynthesis();
   const ttsEnabledRef = useRef(false);
   ttsEnabledRef.current = tts.enabled;
+
+  // Instância da cena Spline (para manipular o robô best-effort no glow pulse).
+  const splineAppRef = useRef<Application | null>(null);
+  const handleSplineLoad = useCallback((app: Application) => {
+    splineAppRef.current = app;
+  }, []);
+
+  // Glow pulse no robô 3D: enquanto o Odin fala, lê tts.volumeRef num rAF e tenta
+  // animar escala/cor de emissão do objeto. Se o objeto não existir, no-op (o
+  // VoiceVisualizer já garante o efeito). Roda só durante a fala.
+  const { volumeRef } = tts;
+  useEffect(() => {
+    if (!tts.speaking) return;
+    const obj = splineAppRef.current?.findObjectByName(SPLINE_FACE_OBJECT);
+    if (!obj) return;
+
+    let raf = 0;
+    const loop = () => {
+      const v = volumeRef.current ?? 0;
+      try {
+        obj.scale.y = 1 + v * 0.6;
+        // Emissão ciano (alto volume) ↔ azul-escuro (silêncio).
+        const r = Math.round(10 + (34 - 10) * v);
+        const g = Math.round(40 + (211 - 40) * v);
+        const b = Math.round(80 + (238 - 80) * v);
+        obj.color = `rgb(${r}, ${g}, ${b})`;
+      } catch {
+        // objeto sem material/escala manipulável → ignora
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(raf);
+      try {
+        obj.scale.y = 1; // restaura ao parar de falar
+      } catch {}
+    };
+  }, [tts.speaking, volumeRef]);
 
   // Estados do RAG e sincronização do HUD Direito
   const [ragStats, setRagStats] = useState<{ count: number; loading: boolean }>({ count: 0, loading: true });
@@ -104,7 +153,7 @@ export default function Cockpit() {
         let lastIndex = 0;
         const sentenceEndRegex = /(?:[^.!?\n]|\.(?=\d))+[.!?\n]+(?=\s|$)/;
 
-        for (;;) {
+        for (; ;) {
           const { done, value } = await reader.read();
           if (done) break;
           acc += decoder.decode(value, { stream: true });
@@ -125,7 +174,7 @@ export default function Cockpit() {
         }
 
         setMessages([...history, { role: "assistant", content: acc }]);
-        
+
         if (ttsEnabledRef.current) {
           const remaining = acc.slice(lastIndex).trim();
           if (remaining) {
@@ -164,6 +213,7 @@ export default function Cockpit() {
       tts.cancel();
       tts.setEnabled(false);
     } else {
+      tts.initAudio(); // gesto do usuário: cria/retoma o AudioContext do glow pulse
       tts.setEnabled(true);
     }
   }, [tts]);
@@ -219,7 +269,7 @@ export default function Cockpit() {
         {/* Área Central: Histórico do Chat ou Hero */}
         <div className="flex min-h-0 flex-1 flex-col pb-3">
           {hasConversation ? (
-            <ResponseStream messages={messages} streaming={streaming} />
+            <ResponseStream messages={messages} streaming={streaming} isLoading={isLoading} />
           ) : (
             <div className="mx-auto mt-auto w-full px-6 pb-6">
               <Hero />
@@ -323,12 +373,15 @@ export default function Cockpit() {
         </div>
       </section>
 
-      {/* Holograma 3D do Robô em Segundo Plano (Centralizado no espaço livre) */}
-      <section className="fixed inset-0 z-0 h-full w-full md:left-[450px] md:right-0 xl:right-[320px] md:w-auto">
+      {/* Holograma 3D do Robô em Segundo Plano (Centralizado no espaço livre com sobreposição para evitar cortes) */}
+      <section className="fixed inset-0 z-0 h-full w-full md:left-[350px] md:right-0 xl:right-[240px] md:w-auto">
         <SplineScene
           scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
           className="h-full w-full"
+          onLoad={handleSplineLoad}
         />
+        {/* Glow pulse confiável: pulsa no ritmo da voz, independe da cena Spline. */}
+        <VoiceVisualizer volumeRef={tts.volumeRef} active={tts.speaking} />
       </section>
     </main>
   );
