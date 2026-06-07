@@ -120,14 +120,14 @@ export default function Cockpit() {
   }, [tts]);
 
   return (
-    <main className="relative flex h-dvh w-screen flex-col overflow-hidden md:flex-row">
+    <main className="relative h-dvh w-screen overflow-hidden">
       {/* Camada -z-10: background puro (shader + spotlight + scrims) */}
       <OdinBackground />
 
-      {/* Coluna Esquerda: Console de Comando e Chat */}
-      <section className="glass relative z-10 flex h-full w-full flex-col border-t-0 border-b-0 border-l-0 rounded-none md:w-[45%] md:min-w-[420px] md:max-w-[550px] md:border-r">
+      {/* Console de Comando e Chat Flutuante (HUD) */}
+      <section className="glass fixed inset-4 z-10 flex flex-col rounded-2xl overflow-hidden md:inset-auto md:left-8 md:top-8 md:bottom-8 md:w-[450px] md:rounded-3xl">
         {/* Header */}
-        <header className="flex items-center justify-between px-6 py-5">
+        <header className="flex flex-none items-center justify-between px-6 py-5">
           <div className="flex items-center gap-3">
             <span className="font-mono text-sm font-semibold tracking-[0.4em] text-neutral-100">
               ODIN
@@ -179,7 +179,7 @@ export default function Cockpit() {
         </div>
 
         {/* Input de Comando */}
-        <div className="px-6 pb-6 md:pb-8">
+        <div className="flex-none px-6 pb-6 md:pb-8">
           <CommandInput
             onSubmit={handleSend}
             onStop={handleStop}
@@ -192,8 +192,8 @@ export default function Cockpit() {
         </div>
       </section>
 
-      {/* Coluna Direita: Holograma 3D do Robô */}
-      <section className="fixed inset-0 z-0 h-full w-full pointer-events-none md:pointer-events-auto md:relative md:inset-auto md:flex-1 md:h-full">
+      {/* Holograma 3D do Robô em Segundo Plano (Deslocado no Desktop) */}
+      <section className="fixed inset-0 z-0 h-full w-full md:left-[15%] md:right-0 md:w-auto">
         <SplineScene
           scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
           className="h-full w-full"
