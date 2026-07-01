@@ -10,10 +10,13 @@ import { retrieveContext, type RetrievedChunk } from "@/lib/rag/retrieve";
 import { executeTool, odinFunctionDeclarations } from "./tools";
 
 /**
- * Modelo padrão do Odin. Gemini 2.5 Flash: rápido e barato, ideal pro chat
- * do cockpit. Para respostas mais profundas, troque por "gemini-2.5-pro".
+ * Modelo padrão do Odin. Gemini 3.5 Flash: estável e "most intelligent for
+ * agentic tasks" — salto grande sobre o 2.5 Flash, mantendo baixa latência pro
+ * chat do cockpit. Configurável via `GEMINI_MODEL` para alternar nos pedidos
+ * difíceis com "gemini-2.5-pro" / "gemini-3.1-pro-preview" (modo profundo) sem
+ * mexer no código.
  */
-const ODIN_MODEL = "gemini-2.5-flash";
+const ODIN_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 
 /** Teto de rodadas do loop de tools - evita laço infinito de function calling. */
 const MAX_TOOL_TURNS = 5;

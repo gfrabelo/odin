@@ -8,6 +8,7 @@ import { CommandInput } from "@/components/interface/CommandInput";
 import { ResponseStream } from "@/components/interface/ResponseStream";
 import { VoiceVisualizer } from "@/components/interface/VoiceVisualizer";
 import { SurfWidget } from "@/components/interface/SurfWidget";
+import { FollowUpChips } from "@/components/interface/FollowUpChips";
 import { useSpeechSynthesis } from "@/lib/voice/use-speech-synthesis";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types";
@@ -74,6 +75,9 @@ export default function Cockpit() {
 
   // Modo Conversa Contínua (hands-free + barge-in).
   const [conversationMode, setConversationMode] = useState(false);
+
+  // Chips de follow-up (structured output): 3 sugestões após cada resposta.
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   // Estados do RAG e sincronização do HUD Direito
   const [ragStats, setRagStats] = useState<{ count: number; loading: boolean }>({ count: 0, loading: true });
@@ -145,6 +149,7 @@ export default function Cockpit() {
   const handleClearChat = useCallback(() => {
     setMessages([]);
     setStreaming("");
+    setSuggestions([]);
     tts.cancel();
   }, [tts]);
 
@@ -163,6 +168,7 @@ export default function Cockpit() {
 
       setMessages(history);
       setStreaming("");
+      setSuggestions([]); // some com os chips antigos enquanto responde
       setIsLoading(true);
       tts.cancel(); // Odin para de falar ao receber novo comando
 
@@ -207,7 +213,11 @@ export default function Cockpit() {
           }
         }
 
-        setMessages([...history, { role: "assistant", content: acc }]);
+        const finalHistory: Message[] = [
+          ...history,
+          { role: "assistant", content: acc },
+        ];
+        setMessages(finalHistory);
 
         if (ttsEnabledRef.current) {
           const remaining = acc.slice(lastIndex).trim();
@@ -215,6 +225,17 @@ export default function Cockpit() {
             tts.speak(remaining);
           }
         }
+
+        // Chips de follow-up: fire-and-forget, nunca bloqueia a UI nem
+        // atrasa o fim do loading. Em qualquer falha, fica sem chips.
+        fetch("/api/suggestions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: finalHistory }),
+        })
+          .then((r) => (r.ok ? r.json() : { suggestions: [] }))
+          .then((d) => setSuggestions(Array.isArray(d.suggestions) ? d.suggestions : []))
+          .catch(() => setSuggestions([]));
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
           // Interrompido pelo usuário: preserva o que já foi gerado.
@@ -346,6 +367,15 @@ export default function Cockpit() {
 
         {/* Input de Comando */}
         <div className="flex-none px-6 pb-6 md:pb-8">
+          {suggestions.length > 0 && (
+            <div className="mb-3">
+              <FollowUpChips
+                suggestions={suggestions}
+                onPick={handleSend}
+                disabled={isLoading}
+              />
+            </div>
+          )}
           <CommandInput
             onSubmit={handleSend}
             onStop={handleStop}
