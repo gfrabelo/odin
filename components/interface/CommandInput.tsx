@@ -19,6 +19,8 @@ interface CommandInputProps {
   odinSpeaking?: boolean;
   /** Barge-in: usuário começou a falar enquanto o Odin falava → corta tudo. */
   onBargeIn?: () => void;
+  /** Callback quando o estado de escuta muda */
+  onListeningChange?: (listening: boolean) => void;
 }
 
 /**
@@ -34,6 +36,7 @@ export function CommandInput({
   conversationMode = false,
   odinSpeaking = false,
   onBargeIn,
+  onListeningChange,
 }: CommandInputProps) {
   const [value, setValue] = useState("");
   const baseRef = useRef(""); // texto digitado antes de começar a falar
@@ -64,6 +67,11 @@ export function CommandInput({
         if (odinSpeaking) onBargeIn?.();
       },
     });
+
+  // Notificar pai sobre mudanças no estado de escuta
+  useEffect(() => {
+    onListeningChange?.(listening);
+  }, [listening, onListeningChange]);
 
   // Modo conversa hands-free MEIA-DUPLEX (evita eco no alto-falante):
   // o mic fica desligado enquanto o Odin FALA e religa sozinho quando ele cala.

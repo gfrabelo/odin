@@ -10,6 +10,7 @@ import { VoiceVisualizer } from "@/components/interface/VoiceVisualizer";
 import { SurfWidget } from "@/components/interface/SurfWidget";
 import { FollowUpChips } from "@/components/interface/FollowUpChips";
 import { useSpeechSynthesis } from "@/lib/voice/use-speech-synthesis";
+import { useOdinBehaviors } from "@/lib/ai/idle-controller";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types";
 import type { Application } from "@splinetool/runtime";
@@ -36,9 +37,21 @@ export default function Cockpit() {
 
   // Instância da cena Spline (para manipular o robô best-effort no glow pulse).
   const splineAppRef = useRef<Application | null>(null);
+  const [splineApp, setSplineApp] = useState<Application | null>(null);
+  const [isListening, setIsListening] = useState(false);
+
   const handleSplineLoad = useCallback((app: Application) => {
     splineAppRef.current = app;
+    setSplineApp(app);
   }, []);
+
+  // Idle and active behaviors manager for Odin
+  const { currentState } = useOdinBehaviors({
+    app: splineApp,
+    speaking: tts.speaking,
+    listening: isListening,
+    thinking: isLoading,
+  });
 
   // Glow pulse no robô 3D: enquanto o Odin fala, lê tts.volumeRef num rAF e tenta
   // animar escala/cor de emissão do objeto. Se o objeto não existir, no-op (o
@@ -384,6 +397,7 @@ export default function Cockpit() {
             conversationMode={conversationMode}
             odinSpeaking={tts.speaking}
             onBargeIn={handleBargeIn}
+            onListeningChange={setIsListening}
           />
           <p className="mt-2 text-center font-mono text-[10px] tracking-wider text-neutral-600">
             Enter envia · Shift+Enter quebra linha
@@ -409,6 +423,10 @@ export default function Cockpit() {
               <div className="flex items-center gap-2 border-b border-white/5 pb-1 text-[10px] uppercase tracking-wider text-neutral-400">
                 <Layers className="size-3.5" />
                 <span>Core Engine</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-neutral-500">Odin State:</span>
+                <span className="text-[var(--odin-accent)] font-bold uppercase tracking-wider animate-pulse">{currentState}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-neutral-500">LLM Core:</span>
