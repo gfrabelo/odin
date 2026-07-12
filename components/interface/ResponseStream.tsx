@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { cn } from "@/lib/utils";
+import { cn, stripToolMarkers } from "@/lib/utils";
 import type { Message } from "@/types";
 
 interface ResponseStreamProps {
@@ -20,6 +20,11 @@ interface ResponseStreamProps {
  */
 export function ResponseStream({ messages, streaming, isLoading }: ResponseStreamProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // O status de tool ("⚙️ Odin acionando") vive no ThoughtBubble; aqui o
+  // chat só mostra conteúdo. Enquanto o stream contém apenas o marcador,
+  // seguem os dots de "pensando".
+  const visibleStreaming = stripToolMarkers(streaming);
 
   // Segue o fim a cada token/mensagem. scrollTop = scrollHeight é o método
   // mais confiável para chat (não depende de scrollIntoView no documento).
@@ -38,11 +43,13 @@ export function ResponseStream({ messages, streaming, isLoading }: ResponseStrea
           <Bubble key={i} role={m.role} content={m.content} />
         ))}
 
-        {isLoading && !streaming && (
+        {isLoading && !visibleStreaming.trim() && (
           <Bubble role="assistant" content="" thinking />
         )}
 
-        {streaming && <Bubble role="assistant" content={streaming} streaming />}
+        {visibleStreaming.trim() && (
+          <Bubble role="assistant" content={visibleStreaming} streaming />
+        )}
       </div>
     </div>
   );
@@ -93,7 +100,8 @@ function Bubble({
           content
         ) : (
           <div className="odin-md">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+            {/* Histórico guarda o acc cru do stream — limpa marcadores de tool. */}
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{stripToolMarkers(content)}</ReactMarkdown>
           </div>
         )}
         {streaming && !thinking && (

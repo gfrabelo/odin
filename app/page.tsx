@@ -9,9 +9,10 @@ import { ResponseStream } from "@/components/interface/ResponseStream";
 import { VoiceVisualizer } from "@/components/interface/VoiceVisualizer";
 import { SurfWidget } from "@/components/interface/SurfWidget";
 import { FollowUpChips } from "@/components/interface/FollowUpChips";
+import { ThoughtBubble } from "@/components/interface/ThoughtBubble";
 import { useSpeechSynthesis } from "@/lib/voice/use-speech-synthesis";
 import { useOdinBehaviors } from "@/lib/ai/idle-controller";
-import { cn } from "@/lib/utils";
+import { cn, stripToolMarkers } from "@/lib/utils";
 import type { Message } from "@/types";
 import type { Application } from "@splinetool/runtime";
 
@@ -218,7 +219,8 @@ export default function Cockpit() {
             while ((match = remaining.match(sentenceEndRegex))) {
               const sentence = match[0].trim();
               lastIndex += match.index! + match[0].length;
-              if (sentence) {
+              // Marcador de tool é status visual (ThoughtBubble), não fala.
+              if (sentence && !sentence.includes("⚙️ Odin acionando")) {
                 tts.speak(sentence);
               }
               remaining = acc.slice(lastIndex);
@@ -233,7 +235,7 @@ export default function Cockpit() {
         setMessages(finalHistory);
 
         if (ttsEnabledRef.current) {
-          const remaining = acc.slice(lastIndex).trim();
+          const remaining = stripToolMarkers(acc.slice(lastIndex)).trim();
           if (remaining) {
             tts.speak(remaining);
           }
@@ -432,14 +434,6 @@ export default function Cockpit() {
                 <span className="text-neutral-500">LLM Core:</span>
                 <span className="text-neutral-100 font-bold">gemini-2.5-flash</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-neutral-500">TTS Voice:</span>
-                <span className="text-[var(--odin-accent)] font-bold">onyx (openai)</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-neutral-500">STT Engine:</span>
-                <span className="text-neutral-100">browser api</span>
-              </div>
             </div>
 
             {/* RAG & Supabase */}
@@ -521,6 +515,9 @@ export default function Cockpit() {
 
         {/* Halo difuso por cima (brilho que vaza na frente). */}
         <VoiceVisualizer volumeRef={tts.volumeRef} active={tts.speaking} layer="front" />
+
+        {/* Balão de pensamento: etapa real do pipeline acima da cabeça do robô. */}
+        <ThoughtBubble isLoading={isLoading} streaming={streaming} speaking={tts.speaking} />
       </section>
     </main>
   );
