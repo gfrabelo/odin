@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Volume2, VolumeX, Database, Cpu, Layers, RefreshCw, Trash2, Headphones, Waves } from "lucide-react";
+import { Volume2, VolumeX, Database, Cpu, Layers, RefreshCw, Trash2, Headphones, Waves, Maximize2, Minimize2 } from "lucide-react";
 import { OdinBackground } from "@/components/interface/OdinBackground";
 import { SplineScene } from "@/components/ui/splite";
 import { CommandInput } from "@/components/interface/CommandInput";
@@ -28,8 +28,20 @@ export default function Cockpit() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isChatExpanded, setIsChatExpanded] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const hasConversation = messages.length > 0 || !!streaming;
+
+  // Fechar o modo expandido ao pressionar a tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isChatExpanded) {
+        setIsChatExpanded(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isChatExpanded]);
 
   // Voz do Odin (TTS). ttsEnabledRef evita closure obsoleto no handleSend.
   const tts = useSpeechSynthesis();
@@ -311,18 +323,40 @@ export default function Cockpit() {
       <OdinBackground />
 
       {/* Console de Comando e Chat Flutuante (HUD Esquerdo) */}
-      <section className="glass fixed inset-4 z-10 flex flex-col rounded-2xl overflow-hidden md:inset-auto md:left-8 md:top-8 md:bottom-8 md:w-[450px] md:rounded-3xl">
+      <section
+        className={cn(
+          "glass fixed z-20 flex flex-col overflow-hidden transition-all duration-300 ease-in-out",
+          isChatExpanded
+            ? "inset-4 md:inset-8 md:max-w-5xl md:mx-auto rounded-2xl md:rounded-3xl shadow-[0_0_80px_rgba(0,0,0,0.8)] backdrop-blur-2xl bg-[#0a0e27]/85 border-[var(--odin-accent)]/30"
+            : "inset-4 md:inset-auto md:left-8 md:top-8 md:bottom-8 md:w-[450px] rounded-2xl md:rounded-3xl"
+        )}
+      >
         {/* Header */}
-        <header className="flex flex-none items-center justify-between px-6 py-5">
+        <header className="flex flex-none items-center justify-between px-6 py-5 border-b border-white/5">
           <div className="flex items-center gap-3">
             <span className="font-mono text-sm font-semibold tracking-[0.4em] text-neutral-100">
               ODIN
             </span>
             <span className="hidden text-[10px] uppercase tracking-[0.3em] text-neutral-500 sm:inline">
-              orquestrador
+              {isChatExpanded ? "focus mode" : "orquestrador"}
             </span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 md:gap-4">
+            <button
+              type="button"
+              onClick={() => setIsChatExpanded((prev) => !prev)}
+              aria-label={isChatExpanded ? "Recolher janela de chat" : "Expandir janela de chat em tela cheia"}
+              title={isChatExpanded ? "Recolher janela (Esc)" : "Expandir conversa em tela cheia"}
+              className={cn(
+                "grid size-8 cursor-pointer place-items-center rounded-lg transition-all duration-200",
+                "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--odin-accent)]",
+                isChatExpanded
+                  ? "bg-[var(--odin-accent)]/20 text-[var(--odin-accent)]"
+                  : "text-neutral-500 hover:text-neutral-300"
+              )}
+            >
+              {isChatExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            </button>
             <button
               type="button"
               onClick={toggleConversation}
@@ -374,8 +408,13 @@ export default function Cockpit() {
           {hasConversation ? (
             <ResponseStream messages={messages} streaming={streaming} isLoading={isLoading} />
           ) : (
-            <div className="mx-auto mt-auto w-full px-6 pb-6">
-              <Hero />
+            <div
+              className={cn(
+                "w-full flex-1 flex flex-col px-6 transition-all duration-500 ease-in-out",
+                isChatExpanded ? "justify-center items-center text-center my-auto" : "justify-end items-start pb-6"
+              )}
+            >
+              <Hero isExpanded={isChatExpanded} />
             </div>
           )}
         </div>
@@ -408,7 +447,14 @@ export default function Cockpit() {
       </section>
 
       {/* HUD Direito: Painel de Controle (Superior) + Surf Report (Inferior) */}
-      <section className="fixed right-8 top-8 bottom-8 w-[320px] z-10 hidden xl:flex flex-col gap-4 animate-in fade-in slide-in-from-right-3 duration-500">
+      <section
+        className={cn(
+          "fixed right-8 top-8 bottom-8 w-[320px] z-10 hidden xl:flex flex-col gap-4 transition-all duration-300 ease-in-out",
+          isChatExpanded
+            ? "opacity-0 pointer-events-none translate-x-8"
+            : "opacity-100 translate-x-0 animate-in fade-in slide-in-from-right-3 duration-500"
+        )}
+      >
         {/* Painel de Controle (Superior) */}
         <div className="glass flex flex-col rounded-3xl overflow-hidden p-5 text-neutral-200 font-mono shrink-0">
           <div className="border-b border-white/10 pb-3">
@@ -523,13 +569,30 @@ export default function Cockpit() {
   );
 }
 
-function Hero() {
+function Hero({ isExpanded }: { isExpanded?: boolean }) {
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-3 pb-6 duration-700">
-      <h1 className="bg-gradient-to-b from-white to-neutral-500 bg-clip-text text-5xl font-bold tracking-tight text-transparent md:text-6xl">
+    <div
+      className={cn(
+        "animate-in fade-in duration-700 transition-all duration-500 ease-in-out flex flex-col",
+        isExpanded ? "items-center text-center max-w-xl mx-auto" : "items-start text-left max-w-md pb-6"
+      )}
+    >
+      <h1
+        className={cn(
+          "bg-gradient-to-b from-white via-neutral-200 to-neutral-500 bg-clip-text font-bold text-transparent transition-all duration-500 ease-in-out",
+          isExpanded
+            ? "text-6xl md:text-7xl lg:text-8xl tracking-[0.15em] drop-shadow-[0_0_35px_rgba(56,189,248,0.2)]"
+            : "text-5xl md:text-6xl tracking-tight"
+        )}
+      >
         ODIN
       </h1>
-      <p className="mt-4 max-w-md text-balance text-neutral-300">
+      <p
+        className={cn(
+          "mt-4 text-balance text-neutral-300 transition-all duration-500 ease-in-out leading-relaxed",
+          isExpanded ? "text-lg md:text-xl max-w-lg font-light text-neutral-200" : "text-sm md:text-base max-w-md"
+        )}
+      >
         A versão externa do seu cérebro. Digite um comando abaixo para começar.
       </p>
     </div>

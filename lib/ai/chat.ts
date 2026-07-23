@@ -221,10 +221,15 @@ export async function* streamOdinResponse(
 
   try {
     for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
+      // Na última rodada, remove as ferramentas: força o modelo a RESPONDER
+      // em texto com o que já coletou, em vez de pedir mais uma tool e estourar
+      // o teto (que devolvia resposta em branco). Fecha o modo de falha do loop
+      // de function calling quando uma busca não acha nada e o modelo insiste.
+      const isLastTurn = turn === MAX_TOOL_TURNS - 1;
       const stream = await createStreamWithRetry({
         model: ODIN_MODEL,
         contents,
-        config,
+        config: isLastTurn ? { systemInstruction: systemPrompt } : config,
       });
 
       const pendingCalls: FunctionCall[] = [];
@@ -267,8 +272,9 @@ export async function* streamOdinResponse(
       // …e volta ao topo do loop para o próximo turno (pode chamar mais tools).
     }
 
-    // Estouro do teto de rodadas: avisa em vez de travar silenciosamente.
-    yield "\n\n_(limite de ações encadeadas atingido)_";
+    // Salvaguarda: a última rodada roda sem tools (força texto), então isto só
+    // é alcançado se o modelo devolver vazio mesmo assim — raro, mas não trava.
+    yield "\n\n_(não consegui concluir o raciocínio; tente reformular)_";
   } catch (geminiError) {
     // Caso ocorra erro e tenhamos key OpenAI, acionamos fallback automático
     if (process.env.OPENAI_API_KEY) {

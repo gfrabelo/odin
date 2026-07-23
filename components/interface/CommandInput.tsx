@@ -113,6 +113,17 @@ export function CommandInput({
         ? "Ouvindo…"
         : "Fale com o Odin…";
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize do textarea conforme o usuário digita
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const nextHeight = Math.min(el.scrollHeight, 160);
+    el.style.height = `${nextHeight}px`;
+  }, [value]);
+
   return (
     <div
       className={cn(
@@ -125,10 +136,11 @@ export function CommandInput({
     >
       <ChevronRight
         aria-hidden
-        className="mt-1.5 size-4 shrink-0 text-neutral-500 transition-colors group-focus-within:text-[var(--odin-accent)]"
+        className="mb-1.5 size-4 shrink-0 text-neutral-500 transition-colors group-focus-within:text-[var(--odin-accent)]"
       />
 
       <textarea
+        ref={textareaRef}
         rows={1}
         value={value}
         disabled={isLoading}
@@ -137,7 +149,7 @@ export function CommandInput({
         placeholder={placeholder}
         aria-label="Comando para o Odin"
         className={cn(
-          "max-h-40 flex-1 resize-none bg-transparent py-1 font-mono text-sm leading-relaxed",
+          "max-h-40 flex-1 resize-none bg-transparent py-1 font-mono text-sm leading-relaxed no-scrollbar",
           "text-neutral-100 placeholder:text-neutral-500 focus:outline-none",
           "disabled:opacity-50"
         )}
