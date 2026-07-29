@@ -10,6 +10,7 @@ import { VoiceVisualizer } from "@/components/interface/VoiceVisualizer";
 import { SurfWidget } from "@/components/interface/SurfWidget";
 import { FollowUpChips } from "@/components/interface/FollowUpChips";
 import { ThoughtBubble } from "@/components/interface/ThoughtBubble";
+import { WorkflowPanel } from "@/components/interface/WorkflowPanel";
 import { useSpeechSynthesis } from "@/lib/voice/use-speech-synthesis";
 import { useOdinBehaviors } from "@/lib/ai/idle-controller";
 import { cn, stripToolMarkers } from "@/lib/utils";
@@ -29,6 +30,7 @@ export default function Cockpit() {
   const [streaming, setStreaming] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isChatExpanded, setIsChatExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<"chat" | "workflows">("chat");
   const abortRef = useRef<AbortController | null>(null);
   const hasConversation = messages.length > 0 || !!streaming;
 
@@ -95,7 +97,7 @@ export default function Cockpit() {
       cancelAnimationFrame(raf);
       try {
         obj.scale.y = 1; // restaura ao parar de falar
-      } catch {}
+      } catch { }
     };
   }, [tts.speaking, volumeRef]);
 
@@ -337,9 +339,33 @@ export default function Cockpit() {
             <span className="font-mono text-sm font-semibold tracking-[0.4em] text-neutral-100">
               ODIN
             </span>
-            <span className="hidden text-[10px] uppercase tracking-[0.3em] text-neutral-500 sm:inline">
-              {isChatExpanded ? "focus mode" : "orquestrador"}
-            </span>
+            {/* Tab toggle: Chat ↔ Workflows */}
+            <div className="flex items-center gap-1 ml-2 rounded-lg bg-white/[0.03] border border-white/[0.06] p-0.5">
+              <button
+                type="button"
+                onClick={() => setActiveTab("chat")}
+                className={cn(
+                  "px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-[0.15em] transition-all duration-200 cursor-pointer",
+                  activeTab === "chat"
+                    ? "bg-[var(--odin-accent)]/15 text-[var(--odin-accent)] shadow-sm"
+                    : "text-neutral-500 hover:text-neutral-300"
+                )}
+              >
+                Chat
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("workflows")}
+                className={cn(
+                  "px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-[0.15em] transition-all duration-200 cursor-pointer",
+                  activeTab === "workflows"
+                    ? "bg-[var(--odin-accent)]/15 text-[var(--odin-accent)] shadow-sm"
+                    : "text-neutral-500 hover:text-neutral-300"
+                )}
+              >
+                ⚡ Agents
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-3 md:gap-4">
             <button
@@ -403,47 +429,53 @@ export default function Cockpit() {
           </div>
         </header>
 
-        {/* Área Central: Histórico do Chat ou Hero */}
-        <div className="flex min-h-0 flex-1 flex-col pb-3">
-          {hasConversation ? (
-            <ResponseStream messages={messages} streaming={streaming} isLoading={isLoading} />
-          ) : (
-            <div
-              className={cn(
-                "w-full flex-1 flex flex-col px-6 transition-all duration-500 ease-in-out",
-                isChatExpanded ? "justify-center items-center text-center my-auto" : "justify-end items-start pb-6"
+        {/* Área Central: Chat ou Workflows (tab-based) */}
+        {activeTab === "chat" ? (
+          <>
+            <div className="flex min-h-0 flex-1 flex-col pb-3">
+              {hasConversation ? (
+                <ResponseStream messages={messages} streaming={streaming} isLoading={isLoading} />
+              ) : (
+                <div
+                  className={cn(
+                    "w-full flex-1 flex flex-col px-6 transition-all duration-500 ease-in-out",
+                    isChatExpanded ? "justify-center items-center text-center my-auto" : "justify-end items-start pb-6"
+                  )}
+                >
+                  <Hero isExpanded={isChatExpanded} />
+                </div>
               )}
-            >
-              <Hero isExpanded={isChatExpanded} />
             </div>
-          )}
-        </div>
 
-        {/* Input de Comando */}
-        <div className="flex-none px-6 pb-6 md:pb-8">
-          {suggestions.length > 0 && (
-            <div className="mb-3">
-              <FollowUpChips
-                suggestions={suggestions}
-                onPick={handleSend}
-                disabled={isLoading}
+            {/* Input de Comando */}
+            <div className="flex-none px-6 pb-6 md:pb-8">
+              {suggestions.length > 0 && (
+                <div className="mb-3">
+                  <FollowUpChips
+                    suggestions={suggestions}
+                    onPick={handleSend}
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
+              <CommandInput
+                onSubmit={handleSend}
+                onStop={handleStop}
+                onVoiceStart={tts.cancel}
+                isLoading={isLoading}
+                conversationMode={conversationMode}
+                odinSpeaking={tts.speaking}
+                onBargeIn={handleBargeIn}
+                onListeningChange={setIsListening}
               />
+              <p className="mt-2 text-center font-mono text-[10px] tracking-wider text-neutral-600">
+                Enter envia · Shift+Enter quebra linha
+              </p>
             </div>
-          )}
-          <CommandInput
-            onSubmit={handleSend}
-            onStop={handleStop}
-            onVoiceStart={tts.cancel}
-            isLoading={isLoading}
-            conversationMode={conversationMode}
-            odinSpeaking={tts.speaking}
-            onBargeIn={handleBargeIn}
-            onListeningChange={setIsListening}
-          />
-          <p className="mt-2 text-center font-mono text-[10px] tracking-wider text-neutral-600">
-            Enter envia · Shift+Enter quebra linha
-          </p>
-        </div>
+          </>
+        ) : (
+          <WorkflowPanel />
+        )}
       </section>
 
       {/* HUD Direito: Painel de Controle (Superior) + Surf Report (Inferior) */}
