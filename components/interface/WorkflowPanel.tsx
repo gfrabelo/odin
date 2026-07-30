@@ -197,12 +197,11 @@ export function WorkflowPanel() {
 
   return (
     <div className="workflow-panel">
-      {/* Header */}
-      <div className="workflow-header">
-        <h2 className="workflow-title">
-          <span className="workflow-icon">⚡</span>
-          Odin Workflows
-        </h2>
+      {/* Header com status */}
+      <div className="flex items-center justify-between border-b border-white/5 pb-2">
+        <span className="text-[10px] uppercase font-mono tracking-widest text-neutral-400">
+          LangGraph Pipeline
+        </span>
         <span className={`workflow-badge workflow-badge--${status}`}>
           {status === "idle" && "Pronto"}
           {status === "running" && "Executando..."}
@@ -234,7 +233,7 @@ export function WorkflowPanel() {
 
       {/* Grafo visual dos agentes */}
       <div className="workflow-graph">
-        {AGENT_ORDER.map((name, i) => {
+        {AGENT_ORDER.map((name) => {
           const config = AGENT_CONFIG[name];
           const isActive = activeNode === name;
           const isCompleted = completedNodes.has(name);
@@ -248,17 +247,13 @@ export function WorkflowPanel() {
                     ? `0 0 16px ${config.color}40`
                     : undefined,
                 }}
+                title={config.label}
               >
                 <span className="workflow-node-icon">{config.icon}</span>
                 <span className="workflow-node-label">{config.label}</span>
                 {isActive && <span className="workflow-node-pulse" />}
                 {isCompleted && <span className="workflow-node-check">✓</span>}
               </div>
-              {i < AGENT_ORDER.length - 1 && (
-                <div
-                  className={`workflow-edge ${isCompleted ? "workflow-edge--done" : ""}`}
-                />
-              )}
             </div>
           );
         })}
@@ -276,10 +271,26 @@ export function WorkflowPanel() {
               <strong>Lead:</strong>{" "}
               {(interruptPayload.leadName as string) ?? "—"} (
               {(interruptPayload.leadSegment as string) ?? "—"})
+              {(interruptPayload.googleMapsUrl as string) && (
+                <a
+                  href={interruptPayload.googleMapsUrl as string}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="workflow-link"
+                  style={{ marginLeft: "0.5rem" }}
+                >
+                  📍 Ver no Maps
+                </a>
+              )}
             </p>
             <p>
               <strong>Score:</strong>{" "}
               {(interruptPayload.qualificationScore as number) ?? 0}/10
+              {(interruptPayload.leadPhone as string) && (
+                <span style={{ marginLeft: "0.75rem", color: "rgba(255,255,255,0.5)" }}>
+                  📞 {interruptPayload.leadPhone as string}
+                </span>
+              )}
             </p>
             {(interruptPayload.opportunities as string[])?.length > 0 && (
               <p>
@@ -303,6 +314,16 @@ export function WorkflowPanel() {
             >
               ✅ Aprovar
             </button>
+            {(interruptPayload.whatsappLink as string) && (
+              <a
+                href={interruptPayload.whatsappLink as string}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="workflow-btn workflow-btn--whatsapp"
+              >
+                📲 Enviar no WhatsApp
+              </a>
+            )}
             <button
               onClick={() => resumeWorkflow("reject")}
               className="workflow-btn workflow-btn--reject"

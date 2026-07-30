@@ -122,9 +122,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }
@@ -134,15 +136,27 @@
    Fora de @layer para ter especificidade máxima.
    !important necessário para sobrescrever o cursor inline
    que o runtime do Spline injeta via JS no canvas.            */
-html, body, canvas, div {
+html,
+body,
+canvas,
+div {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='4' fill='none' stroke='%2338bdf8' stroke-width='1.5'/%3E%3Cline x1='16' y1='2' x2='16' y2='10' stroke='%2338bdf8' stroke-width='1' opacity='0.5'/%3E%3Cline x1='16' y1='22' x2='16' y2='30' stroke='%2338bdf8' stroke-width='1' opacity='0.5'/%3E%3Cline x1='2' y1='16' x2='10' y2='16' stroke='%2338bdf8' stroke-width='1' opacity='0.5'/%3E%3Cline x1='22' y1='16' x2='30' y2='16' stroke='%2338bdf8' stroke-width='1' opacity='0.5'/%3E%3Ccircle cx='16' cy='16' r='1' fill='%2338bdf8'/%3E%3C/svg%3E") 16 16, crosshair !important;
 }
+
 /* Preserva cursor de texto em inputs */
-input, textarea, [contenteditable] {
+input,
+textarea,
+[contenteditable] {
   cursor: text !important;
 }
+
 /* Preserva pointer em elementos clicáveis */
-a, button, [role="button"], label[for], select, summary {
+a,
+button,
+[role="button"],
+label[for],
+select,
+summary {
   cursor: pointer !important;
 }
 
@@ -158,6 +172,7 @@ a, button, [role="button"], label[for], select, summary {
     opacity: 0;
     transform: translate(-72%, -62%) scale(0.5);
   }
+
   100% {
     opacity: 1;
     transform: translate(-50%, -40%) scale(1);
@@ -180,25 +195,24 @@ a, button, [role="button"], label[for], select, summary {
   }
 }
 
-/* ── Odin: design tokens do cockpit (Spatial UI / glassmorphism) ─ */
 :root {
   /* Accent "arc-reactor" - ciano elétrico. */
   --odin-accent: #38bdf8;
   --odin-accent-soft: rgba(56, 189, 248, 0.16);
-  /* Superfícies de vidro sobre o 3D. */
-  --odin-glass: rgba(10, 14, 39, 0.55);
-  --odin-glass-border: rgba(255, 255, 255, 0.08);
+  /* Superfícies de vidro sobre o 3D (Translúcido para transparência elegante dos braços do robô). */
+  --odin-glass: rgba(8, 12, 32, 0.938);
+  --odin-glass-border: rgba(255, 255, 255, 0.1);
 }
 
 /* Vidro reutilizável: blur + borda sutil + leve brilho interno. */
 .glass {
   background: var(--odin-glass);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
   border: 1px solid var(--odin-glass-border);
   box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
-    0 8px 40px -12px rgba(0, 0, 0, 0.6);
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
+    0 10px 40px -10px rgba(0, 0, 0, 0.5);
 }
 
 /* Respeita usuários que preferem menos movimento. */
@@ -207,6 +221,7 @@ a, button, [role="button"], label[for], select, summary {
     animation: none;
     opacity: 1;
   }
+
   *,
   *::before,
   *::after {
@@ -222,53 +237,66 @@ a, button, [role="button"], label[for], select, summary {
   scrollbar-color: rgba(56, 189, 248, 0.3) transparent;
   scrollbar-gutter: stable;
 }
+
 .odin-scroll::-webkit-scrollbar {
   width: 6px;
 }
+
 .odin-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .odin-scroll::-webkit-scrollbar-thumb {
   background: rgba(56, 189, 248, 0.25);
   border-radius: 9999px;
 }
+
 .odin-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(56, 189, 248, 0.5);
 }
 
 /* ── Odin: estilo de markdown nas respostas (dark/glass) ─────── */
-.odin-md > :first-child {
+.odin-md> :first-child {
   margin-top: 0;
 }
-.odin-md > :last-child {
+
+.odin-md> :last-child {
   margin-bottom: 0;
 }
+
 .odin-md p {
   margin: 0.5em 0;
 }
+
 .odin-md ul,
 .odin-md ol {
   margin: 0.5em 0;
   padding-left: 1.3em;
 }
+
 .odin-md ul {
   list-style: disc;
 }
+
 .odin-md ol {
   list-style: decimal;
 }
+
 .odin-md li {
   margin: 0.2em 0;
 }
+
 .odin-md a {
   color: var(--odin-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
 .odin-md strong {
   color: #fff;
   font-weight: 600;
 }
+
 .odin-md h1,
 .odin-md h2,
 .odin-md h3,
@@ -277,6 +305,7 @@ a, button, [role="button"], label[for], select, summary {
   line-height: 1.3;
   margin: 0.7em 0 0.3em;
 }
+
 .odin-md code {
   font-family: var(--font-geist-mono), monospace;
   font-size: 0.85em;
@@ -284,6 +313,7 @@ a, button, [role="button"], label[for], select, summary {
   padding: 0.12em 0.36em;
   border-radius: 5px;
 }
+
 .odin-md pre {
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid var(--odin-glass-border);
@@ -292,23 +322,27 @@ a, button, [role="button"], label[for], select, summary {
   overflow-x: auto;
   margin: 0.6em 0;
 }
+
 .odin-md pre code {
   background: none;
   padding: 0;
   font-size: 0.82em;
 }
+
 .odin-md blockquote {
   border-left: 2px solid var(--odin-accent);
   padding-left: 0.8em;
   margin: 0.5em 0;
   color: #cbd5e1;
 }
+
 .odin-md table {
   width: 100%;
   border-collapse: collapse;
   margin: 0.6em 0;
   font-size: 0.9em;
 }
+
 .odin-md th,
 .odin-md td {
   border: 1px solid var(--odin-glass-border);
@@ -321,6 +355,7 @@ a, button, [role="button"], label[for], select, summary {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -399,8 +434,15 @@ a, button, [role="button"], label[for], select, summary {
 }
 
 @keyframes pulse-badge {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* Input Group */
@@ -504,38 +546,43 @@ a, button, [role="button"], label[for], select, summary {
 
 /* Node Graph */
 .workflow-graph {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  padding: 1rem 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0.65rem 0.4rem;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 1rem;
+  width: 100%;
 }
 
 .workflow-graph-step {
   display: flex;
   align-items: center;
+  position: relative;
+  width: 100%;
+  min-width: 0;
 }
 
 .workflow-node {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.6rem 0.75rem;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.15rem;
   border-radius: 0.75rem;
   border: 1.5px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   transition: all 0.3s ease;
   position: relative;
-  min-width: 5rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .workflow-node--active {
   background: rgba(255, 255, 255, 0.06);
-  border-width: 2px;
+  border-width: 1.5px;
 }
 
 .workflow-node--done {
@@ -544,14 +591,20 @@ a, button, [role="button"], label[for], select, summary {
 }
 
 .workflow-node-icon {
-  font-size: 1.3rem;
+  font-size: 1.15rem;
+  line-height: 1;
 }
 
 .workflow-node-label {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.65);
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  padding: 0 0.1rem;
 }
 
 .workflow-node--active .workflow-node-label {
@@ -568,35 +621,31 @@ a, button, [role="button"], label[for], select, summary {
 }
 
 @keyframes node-pulse {
-  0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(1.12); opacity: 0; }
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  100% {
+    transform: scale(1.12);
+    opacity: 0;
+  }
 }
 
 .workflow-node-check {
   position: absolute;
   top: -0.35rem;
   right: -0.35rem;
-  width: 1rem;
-  height: 1rem;
+  width: 0.9rem;
+  height: 0.9rem;
   border-radius: 50%;
   background: #34d399;
   color: #000;
-  font-size: 0.55rem;
+  font-size: 0.5rem;
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.workflow-edge {
-  width: 1.5rem;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.08);
-  transition: background 0.3s;
-}
-
-.workflow-edge--done {
-  background: rgba(52, 211, 153, 0.4);
 }
 
 /* Human Review */
@@ -735,4 +784,35 @@ a, button, [role="button"], label[for], select, summary {
 .workflow-event-detail {
   color: rgba(255, 255, 255, 0.8);
   line-height: 1.4;
+}
+
+/* WhatsApp button */
+.workflow-btn--whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(37, 211, 102, 0.15);
+  color: #25d366;
+  border-color: rgba(37, 211, 102, 0.3);
+  text-decoration: none;
+}
+
+.workflow-btn--whatsapp:hover {
+  background: rgba(37, 211, 102, 0.25);
+  box-shadow: 0 0 12px rgba(37, 211, 102, 0.2);
+}
+
+/* Maps / external link */
+.workflow-link {
+  display: inline;
+  color: rgba(96, 165, 250, 0.8);
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.workflow-link:hover {
+  color: #93c5fd;
+  text-decoration: underline;
 }

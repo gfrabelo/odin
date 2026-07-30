@@ -39,6 +39,22 @@ interface HumanReviewPayload {
   opportunities: string[];
   outreachDraft: string;
   revisionCount: number;
+  /** Link wa.me pronto para enviar a mensagem (null se sem telefone). */
+  whatsappLink: string | null;
+  /** URL do Google Maps do lead (null se não disponível). */
+  googleMapsUrl: string | null;
+}
+
+/**
+ * Gera link https://wa.me/{phone}?text={encodedMessage}
+ * O phone deve estar no formato internacional sem "+" (ex: 5513999999999).
+ */
+function buildWhatsAppLink(phone: string | null, message: string): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  const encodedMessage = encodeURIComponent(message);
+  return `https://wa.me/${digits}?text=${encodedMessage}`;
 }
 
 /** Resposta que o humano envia de volta. */
@@ -86,6 +102,8 @@ export async function humanReviewNode(
     opportunities: state.qualification?.opportunities ?? [],
     outreachDraft: state.outreachDraft,
     revisionCount: state.revisionCount,
+    whatsappLink: buildWhatsAppLink(lead.phone, state.outreachDraft),
+    googleMapsUrl: lead.googleMapsUrl ?? null,
   };
 
   // ══════════════════════════════════════════════════════════════

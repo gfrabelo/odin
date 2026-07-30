@@ -59,6 +59,8 @@ export interface LeadInfo {
   rating: number | null;
   /** Fonte de onde veio o lead. */
   source: string;
+  /** URL direta do Google Maps (deep-link). */
+  googleMapsUrl: string | null;
 }
 
 /** Resultado da qualificação do lead pelo Qualifier. */

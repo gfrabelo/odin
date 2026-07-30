@@ -1,49 +1,28 @@
 "use client";
 
 import { Spotlight } from "@/components/ui/spotlight";
-import { WebGLShader } from "@/components/ui/web-gl-shader";
+import KineticGrid from "@/components/ui/kinetic-grid";
 
 /**
- * Background puramente visual do cockpit: shader WebGL + spotlight + scrims.
- * Nenhum elemento interativo aqui - tudo é pointer-events-none.
- * A cena 3D do Spline é renderizada separadamente em page.tsx para
- * garantir que os eventos de mouse (olhar do robô) funcionem corretamente.
+ * Background puramente visual do cockpit: KineticGrid shader + spotlight.
+ * Posicionado na camada base z-0 (atrás do robô 3D z-10 e dos cards z-20).
  */
 export function OdinBackground() {
   return (
-    <div className="fixed inset-0 -z-10 overflow-hidden bg-background pointer-events-none">
-      {/* Background animado em shader WebGL */}
-      <WebGLShader />
+    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+      {/* Background animado interativo em Canvas / Kinetic Grid */}
+      <KineticGrid globalColor="default" className="fixed inset-0 w-full h-full" />
 
       {/* Spotlight cinematográfico */}
       <Spotlight className="-top-40 left-10 md:-top-20 md:left-1/3" fill="#7dd3fc" />
 
-      {/* Scrims: profundidade + legibilidade do texto sobre o 3D.
-          - radial central: vinheta sutil
-          - lateral esquerda: escurece onde fica o hero/conversa
-          - inferior: ancora o input de comando */}
+      {/* Vinheta sutil nas bordas */}
       <div
         aria-hidden
-        className="absolute inset-0"
+        className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(120% 120% at 60% 40%, transparent 30%, rgba(10,14,39,0.55) 100%)",
-        }}
-      />
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(90deg, rgba(10,14,39,0.92) 0%, rgba(10,14,39,0.55) 32%, transparent 60%)",
-        }}
-      />
-      <div
-        aria-hidden
-        className="absolute inset-x-0 bottom-0 h-1/2"
-        style={{
-          background:
-            "linear-gradient(180deg, transparent 0%, rgba(10,14,39,0.6) 55%, rgba(10,14,39,0.95) 100%)",
+            "radial-gradient(ellipse at center, transparent 50%, rgba(10,14,39,0.5) 100%)",
         }}
       />
     </div>

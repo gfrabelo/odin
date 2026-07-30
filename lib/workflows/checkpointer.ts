@@ -27,21 +27,21 @@
 import { MemorySaver } from "@langchain/langgraph";
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
 
-/** Singleton do checkpointer — criado uma vez, reutilizado. */
-let cachedCheckpointer: BaseCheckpointSaver | null = null;
+const globalForCheckpointer = globalThis as unknown as {
+  __odinCheckpointer?: BaseCheckpointSaver;
+};
 
 /**
  * Cria (ou retorna) o checkpointer do Odin Workflows.
  *
  * Lógica de seleção:
  * 1. Se REDIS_URL está configurada → tenta RedisSaver (produção)
- * 2. Senão → MemorySaver (dev local)
- *
- * O RedisSaver é importado dinamicamente para não travar se o
- * pacote `@langchain/langgraph-checkpoint-redis` não estiver instalado.
+ * 2. Senão → MemorySaver (dev local, preservado em globalThis para sobreviver a hot-reloads)
  */
 export async function getCheckpointer(): Promise<BaseCheckpointSaver> {
-  if (cachedCheckpointer) return cachedCheckpointer;
+  if (globalForCheckpointer.__odinCheckpointer) {
+    return globalForCheckpointer.__odinCheckpointer;
+  }
 
   const redisUrl = process.env.REDIS_URL;
 
@@ -53,11 +53,11 @@ export async function getCheckpointer(): Promise<BaseCheckpointSaver> {
         // @ts-expect-error — pacote opcional, só instalado em prod.
         "@langchain/langgraph-checkpoint-redis"
       );
-      const redisSaver = await RedisSaver.fromUrl(redisUrl, {
+      const redisSaver = (await RedisSaver.fromUrl(redisUrl, {
         defaultTTL: 60, // minutos
         refreshOnRead: true,
-      }) as BaseCheckpointSaver;
-      cachedCheckpointer = redisSaver;
+      })) as BaseCheckpointSaver;
+      globalForCheckpointer.__odinCheckpointer = redisSaver;
       console.log("[Odin Workflow] Checkpointer: Redis conectado ✅");
       return redisSaver;
     } catch (err) {
@@ -68,12 +68,11 @@ export async function getCheckpointer(): Promise<BaseCheckpointSaver> {
     }
   }
 
-  // Fallback: MemorySaver (in-memory, perde no restart)
+  // Fallback: MemorySaver (in-memory, salvo em globalThis para dev)
   const memorySaver: BaseCheckpointSaver = new MemorySaver();
-  cachedCheckpointer = memorySaver;
+  globalForCheckpointer.__odinCheckpointer = memorySaver;
   console.log(
-    "[Odin Workflow] Checkpointer: MemorySaver (in-memory). " +
-      "Configure REDIS_URL para persistência real."
+    "[Odin Workflow] Checkpointer: MemorySaver (in-memory dev singleton)."
   );
   return memorySaver;
 }
