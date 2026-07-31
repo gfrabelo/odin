@@ -1,52 +1,98 @@
-# ⚡ Odin - O Cockpit de IA & Segundo Cérebro do Futuro 🤖
+# ⚡ Odin — Cockpit de IA Pessoal & Orquestrador Multi-Agente 🤖
 
-O **Odin** é um assistente de inteligência artificial pessoal projetado para funcionar como um orquestrador de conhecimento e um segundo cérebro externo. Ele une uma interface visual altamente imersiva e futurista de "cockpit" com uma camada avançada de **RAG (Retrieval-Augmented Generation)** conectada diretamente a um vault do Obsidian.
+O **Odin** é um assistente de inteligência artificial pessoal com duas grandes capacidades:
+
+1. **Chat com Segundo Cérebro** — Conversação em streaming com RAG sobre um vault Obsidian (pgvector), function calling, voz bidirecional e interface 3D imersiva.
+2. **Workflows Multi-Agente** — Orquestração de agentes especialistas via LangGraph.js para tarefas complexas como prospecção B2B, com human-in-the-loop e dados reais do Google Maps.
 
 ---
 
 ## 🌌 Visão Geral da Interface
 
-A interface do Odin foi concebida para parecer um terminal de comando premium e interativo:
-* **Robô 3D Interativo (Spline):** Um modelo 3D no centro da tela que reage em tempo real, acompanhando a movimentação do seu cursor com o olhar (*gaze tracking*).
-* **Background Dinâmico WebGL:** Um background animado de shader rodando em Three.js por trás do cockpit.
-* **Aparência Glassmorphism & UI Cyberpunk:** Controles semi-transparentes com efeito de vidro fosco, tons neon de ciano e cinza escuro, além de um cursor customizado em formato de mira (*crosshair*).
-* **Modo de Voz Integrado:** Controle completo por voz (fala e escuta) com feedbacks dinâmicos na tela.
+A interface do Odin funciona em duas abas: **Chat** (assistente pessoal) e **⚡ Agents** (workflows multi-agente).
+
+* **Robô 3D Interativo (Spline):** Modelo 3D que reage em tempo real — gaze tracking e glow pulse sincronizado com a voz.
+* **Background Dinâmico WebGL:** Shader animado em Three.js.
+* **Glassmorphism & UI Cyberpunk:** Controles semi-transparentes, tons neon, cursor crosshair.
+* **Workflow Panel:** Grafo visual dos agentes com status em tempo real, log de eventos e painel de revisão humana com botão WhatsApp integrado.
 
 ---
 
 ## 🧠 Recursos Principais
 
-### 1. Camada RAG Integrada com Obsidian & Supabase 📚
-O Odin lê e indexa as suas notas pessoais armazenadas em um vault do Obsidian em formato Markdown, permitindo que a IA responda com contexto real da sua vida, projetos e anotações.
-* **Indexação Incremental (`npm run sync`):** Um script que verifica alterações nas notas usando hash SHA-1 e indexa apenas arquivos alterados ou novos no banco de dados.
-* **Auto-Sync:** Integrado com um Git Hook `post-commit` no vault Obsidian: ao commitar notas novas ou modificações no wiki, o Odin sincroniza o banco de dados automaticamente.
-* **Armazenamento Vetorial:** Banco de dados **Supabase (PostgreSQL)** com a extensão `pgvector` e índice HNSW para busca por similaridade de cosseno ultrarrápida.
-* **Embeddings Eficientes:** Embeddings gerados a partir do `gemini-embedding-001` otimizados para 768 dimensões.
+### 1. Chat com RAG Integrado (Obsidian & Supabase) 📚
+
+O Odin lê e indexa notas pessoais do Obsidian, respondendo com contexto real da sua vida e projetos.
+
+* **Indexação Incremental (`npm run sync`):** Verifica alterações via hash SHA-1 e indexa apenas arquivos novos/modificados.
+* **Auto-Sync:** Git Hook `post-commit` no vault dispara sincronização automática.
+* **Armazenamento Vetorial:** Supabase (PostgreSQL) + `pgvector` com índice HNSW para busca por similaridade ultrarrápida.
+* **Embeddings:** `gemini-embedding-001` otimizados para 768 dimensões.
 
 ### 2. Conversação por Voz (STT & TTS) 🎙️
-* **Speech-to-Text (STT):** O Odin transcreve sua voz ao vivo através do navegador (Web Speech API) e envia o comando automaticamente quando você faz uma pausa natural.
-* **Text-to-Speech (TTS):** O Odin lê as respostas com voz natural via **OpenAI TTS** (voz `onyx`, velocidade ajustável), em fila por frase para começar a falar enquanto o resto ainda é gerado.
-* **Modo Conversa Contínua (Hands-Free):** Botão de headset que mantém o microfone ativo entre os turnos - você fala, o Odin responde, e o mic religa sozinho, sem clicar. Funciona em **meia-duplex** (mic pausa enquanto o Odin fala) para evitar eco no alto-falante.
-* **Glow Pulse (Lip-Sync Visual):** Um anel neon pulsa atrás da cabeça do robô no ritmo exato da voz do Odin, sincronizado via Web Audio (`AnalyserNode`).
-* **Cancelamento Inteligente / Barge-in:** O áudio é interrompido imediatamente ao iniciar um novo comando, desativar a voz, ou (com fones) ao começar a falar por cima do Odin.
 
-### 3. Ações & Function Calling 🛠️
-O Odin não é só um chatbot passivo - ele executa ações através de um loop de ferramentas no servidor:
-* **`searchSecondBrain`:** busca semântica dirigida no vault (além do RAG automático).
-* **`readObsidianNote`:** lê uma nota inteira do Obsidian (com guard de segurança contra path-traversal).
-* **`webSearch`:** busca na web (mock por padrão; pronto para plugar uma Search API real).
-* **`getSurfForecast`:** condições de surf e tempo em tempo real para Peruíbe/SP via **Open-Meteo** (Marine + Weather, sem chave) - o Odin comenta ondas, período, swell e vento com tom de surfista.
+* **Speech-to-Text (STT):** Web Speech API com envio automático na pausa natural.
+* **Text-to-Speech (TTS):** OpenAI TTS (`tts-1`, voz onyx), em fila por frase para falar enquanto o resto é gerado.
+* **Modo Conversa Contínua (Hands-Free):** Meia-duplex com reativação automática do microfone.
+* **Glow Pulse (Lip-Sync Visual):** Anel neon pulsa no ritmo da voz via Web Audio (`AnalyserNode`).
+* **Barge-in:** Áudio interrompido ao iniciar novo comando.
 
-### 4. Engenharia de Chat Robusta & Agnóstica ⚡
-* **Provider Isolado:** A lógica da IA fica encapsulada atrás de um contrato estável de streaming. O Odin hoje utiliza o SDK `@google/genai` (modelo `gemini-2.5-flash`), mas o core do app é agnóstico e pronto para multi-modelos (como Claude ou GPT).
-* **Retry com Backoff:** Erros transitórios da API (rate limit 429, sobrecarga 503) são repetidos automaticamente com backoff exponencial, com mensagem amigável se a cota estourar.
-* **Fail-Safe:** Caso o Supabase esteja offline ou desconfigurado, o RAG falha silenciosamente e o Odin continua respondendo com o modelo geral de forma ininterrupta.
+### 3. Function Calling 🛠️
+
+O Odin executa ações no servidor via loop de ferramentas:
+
+* **`searchSecondBrain`:** Busca semântica no vault Obsidian.
+* **`readObsidianNote`:** Lê nota inteira (com guard de path-traversal e confidencialidade).
+* **`webSearch`:** Busca web via Tavily (fallback mock sem chave).
+* **`getSurfForecast`:** Surf e tempo em Peruíbe/SP via Open-Meteo (Marine + Weather).
+
+### 4. Workflows Multi-Agente (LangGraph.js) 🔗
+
+Módulo de orquestração de agentes especialistas usando **LangGraph.js** com padrão **Supervisor (Hub-and-Spoke)**.
+
+#### Arquitetura do Grafo
+
+```mermaid
+graph LR
+    S[🧠 Supervisor] --> R[🔍 Researcher]
+    S --> Q[📊 Qualifier]
+    S --> C[✍️ Copywriter]
+    S --> H[👤 Human Review]
+    R --> S
+    Q --> S
+    C --> S
+    H --> S
+```
+
+#### Agentes Especialistas
+
+| Agente | Papel | Tecnologia |
+|--------|-------|------------|
+| **Supervisor** | Roteador determinístico — gerencia estado, rotação de leads e transições | Regras TypeScript (sem LLM) |
+| **Researcher** | Pesquisa leads reais com dados estruturados | Apify Google Maps Scraper (fallback: Tavily) |
+| **Qualifier** | Avalia cada lead (score 0-10, oportunidades) | Gemini 3.5 Flash + Structured Output |
+| **Copywriter** | Escreve mensagem WhatsApp (máx. 5 linhas, tom inferido do segmento) | Gemini 3.5 Flash + prompt battle-tested |
+| **Human Review** | Pausa o workflow via `interrupt()` para aprovação humana | LangGraph HITL |
+
+#### Funcionalidades do Workflow
+
+* **Apify Google Maps Integration:** Dados reais de empresas (nome, telefone, website, rating, endereço, URL do Maps).
+* **Human-in-the-Loop:** Revisão com botões Aprovar / Rejeitar / Revisar antes de qualquer ação externa.
+* **Link wa.me:** Botão "📲 Enviar no WhatsApp" gera link `https://wa.me/{phone}?text={mensagem}` com a mensagem pronta.
+* **Link Google Maps:** "📍 Ver no Maps" para cada lead.
+* **Streaming SSE:** Progresso em tempo real (qual agente está rodando, resultados parciais, interrupções).
+* **Checkpointing:** MemorySaver (dev, `globalThis` singleton) com fallback para Redis (produção).
+* **Rotação Determinística de Leads:** Supervisor avança automaticamente para o próximo lead após aprovação/rejeição, com limpeza de estado e encerramento ao processar todos os leads.
+
+### 5. Engenharia de Chat Robusta & Agnóstica ⚡
+
+* **Provider Isolado:** Contrato estável de streaming. Gemini hoje, agnóstico para multi-modelos.
+* **Retry com Backoff:** Rate limit (429) e sobrecarga (503) repetidos com backoff exponencial.
+* **Fail-Safe:** Supabase offline? RAG falha silenciosamente. Sem chave Apify? Cai no Tavily. Sem Tavily? Mock. O Odin nunca trava.
 
 ---
 
 ## 🏗️ Arquitetura do Fluxo de Dados
-
-Abaixo está o ciclo de vida de uma mensagem e o fluxo de sincronização do RAG:
 
 ```mermaid
 graph TD
@@ -67,9 +113,19 @@ graph TD
         CH -->|Busca contexto| RET[lib/rag/retrieve.ts]
         RET -->|Match Documents| SUP_DB
         RET -->|Retorna Chunks| CH
-        CH -->|Prompt + Contexto| GEM_Chat[Gemini 2.5 Flash API]
+        CH -->|Prompt + Contexto| GEM_Chat[Gemini 3.5 Flash API]
         GEM_Chat -->|Text Stream| API
         API -->|ReadableStream| UI
+    end
+
+    subgraph Workflows [Odin Workflows - LangGraph.js]
+        WF_UI[WorkflowPanel.tsx] -->|POST /api/workflow| WF_API[api/workflow/route.ts]
+        WF_API -->|createProspectWorkflow| GRAPH[lib/workflows/graph.ts]
+        GRAPH -->|stream updates SSE| WF_API
+        WF_API -->|Server-Sent Events| WF_UI
+        GRAPH -->|Apify REST API| APIFY[(Google Maps)]
+        GRAPH -->|interrupt| HITL[Human-in-the-Loop]
+        HITL -->|PUT /api/workflow| WF_API
     end
 ```
 
@@ -77,13 +133,17 @@ graph TD
 
 ## 🛠️ Tecnologias Utilizadas
 
-* **Framework:** Next.js 16.2 (App Router, Turbopack)
-* **Estilização:** Tailwind CSS v4, Vanilla CSS (Custom Glassmorphism)
-* **3D / Gráficos:** `@splinetool/react-spline` & `Three.js` (WebGL Custom Shader)
-* **Banco de Dados:** Supabase (PostgreSQL) + `pgvector`
-* **Inteligência Artificial:** SDK Oficial do Gemini (`@google/genai`) com Function Calling
-* **Voz:** Web Speech API (STT) + OpenAI TTS (`tts-1`, voz onyx) + Web Audio (`AnalyserNode` para o glow pulse)
-* **Dados externos:** Open-Meteo (Marine & Weather API, sem chave) para a ferramenta de surf
+| Camada | Tecnologia |
+|--------|-----------|
+| **Framework** | Next.js 16.2 (App Router, Turbopack) |
+| **Estilização** | Tailwind CSS v4, Vanilla CSS (Glassmorphism) |
+| **3D / Gráficos** | `@splinetool/react-spline` & `Three.js` (WebGL Shader) |
+| **Banco de Dados** | Supabase (PostgreSQL) + `pgvector` |
+| **IA (Chat)** | `@google/genai` (Gemini 3.5 Flash) com Function Calling |
+| **IA (Workflows)** | `@langchain/langgraph` (StateGraph, Supervisor Pattern) |
+| **Scraping** | Apify REST API (Google Maps Scraper) |
+| **Voz** | Web Speech API (STT) + OpenAI TTS + Web Audio |
+| **Dados Externos** | Open-Meteo (Marine & Weather) para surf |
 
 ---
 
@@ -96,46 +156,62 @@ cd odin
 ```
 
 ### 2. Configurar Variáveis de Ambiente
-Crie um arquivo `.env.local` na raiz do projeto baseado no `.env.local.example`:
 ```bash
 cp .env.local.example .env.local
 ```
 Preencha com suas credenciais:
-* `GEMINI_API_KEY`: Sua chave de API do Google AI Studio. **(obrigatória)**
-* `OPENAI_API_KEY`: Chave da OpenAI para a voz do Odin (TTS). Sem ela, o chat funciona normalmente, mas sem áudio.
-* `SUPABASE_URL`: URL do seu projeto no Supabase.
-* `SUPABASE_SERVICE_ROLE_KEY`: Chave de acesso de serviço (service role) do Supabase para leitura/escrita vetorial.
-* `VAULT_PATH`: Caminho local para o seu Vault do Obsidian (ex: `../segundo-cerebro`). Usado pelo sync e pela ferramenta `readObsidianNote`.
-* _(opcionais)_ `OPENAI_TTS_VOICE`, `OPENAI_TTS_SPEED` (default `1.15`), `SEARCH_API_KEY` (liga a busca web real), `INGEST_DIRS`.
+
+| Variável | Obrigatória | Descrição |
+|----------|:-----------:|-----------|
+| `GEMINI_API_KEY` | ✅ | Chave API do Google AI Studio |
+| `OPENAI_API_KEY` | — | Para voz (TTS). Sem ela, chat funciona sem áudio |
+| `SUPABASE_URL` | — | URL do projeto Supabase (RAG) |
+| `SUPABASE_SERVICE_ROLE_KEY` | — | Service role key do Supabase |
+| `VAULT_PATH` | — | Caminho local do vault Obsidian (padrão: `../segundo-cerebro`) |
+| `APIFY_API_TOKEN` | — | Token API Apify para Google Maps Scraper (Workflows) |
+| `SEARCH_API_KEY` | — | Chave Tavily para busca web real |
 
 ### 3. Configurar o Banco de Dados (Supabase)
-Execute as queries SQL contidas em `supabase/schema.sql` no painel do Supabase (SQL Editor) para criar a tabela `documents`, os índices e a função de busca por similaridade `match_documents`.
+Execute as queries em `supabase/schema.sql` no painel SQL Editor do Supabase.
 
-### 4. Instalar Dependências e Rodar o Servidor de Dev
+### 4. Instalar Dependências e Rodar
 ```bash
 npm install
 npm run dev
 ```
-O cockpit estará ativo em [http://localhost:3000](http://localhost:3000).
+Cockpit ativo em [http://localhost:3000](http://localhost:3000).
 
 ### 5. Sincronizar o Vault Obsidian (RAG)
-Para popular o banco com as suas notas do Obsidian:
 ```bash
 npm run sync
 ```
 
 ---
 
-## ✅ Entregue Recentemente
+## ✅ Entregue
 
-* **[x] Ações / Function Calling:** loop de ferramentas no servidor (busca no cérebro, leitura de notas, busca web, previsão de surf).
-* **[x] Voz Contínua + Barge-in:** modo conversa hands-free (meia-duplex, sem eco) com reativação automática do microfone.
-* **[x] Glow Pulse:** sincronização visual da voz (anel neon atrás da cabeça do robô).
+* [x] Chat em streaming com Gemini (fallback OpenAI)
+* [x] RAG sobre vault Obsidian via Supabase/pgvector
+* [x] Function Calling (4 tools: searchSecondBrain, readObsidianNote, webSearch, getSurfForecast)
+* [x] Voz bidirecional (STT nativo + TTS OpenAI) com modo contínuo hands-free
+* [x] Glow Pulse sincronizado com voz (Web Audio AnalyserNode)
+* [x] Barge-in inteligente
+* [x] UI imersiva com robô 3D (Spline), glass UI, background WebGL
+* [x] **Workflows Multi-Agente (LangGraph.js)** — Supervisor, Researcher, Qualifier, Copywriter, Human Review
+* [x] **Apify Google Maps Scraper** — leads reais com telefone, website, rating
+* [x] **Copywriter battle-tested** — máx. 5 linhas, tom inferido, zero linguagem corporativa
+* [x] **Human-in-the-loop** — interrupt/resume com checkpointing
+* [x] **Link wa.me** — botão WhatsApp com mensagem pré-carregada
+* [x] **Rotação determinística de leads** — avanço automático + limpeza de estado
+* [x] **Fail-safe em cascata** — Apify → Tavily → mock; Supabase offline → RAG silencioso
 
-## 🗺️ Roadmap Futuro
+## 🗺️ Roadmap
 
-* **[ ] Escrita no Vault:** ferramenta `writeObsidianNote` para o Odin criar/editar notas diretamente no Obsidian.
-* **[ ] Busca Web Real:** trocar o mock de `webSearch` por uma Search API (Brave / Serper / Tavily).
-* **[ ] Persistência de Conversas:** múltiplos chats (threads) com histórico salvo localmente ou no Supabase.
-* **[ ] Citações Interativas:** Links clicáveis para abrir as notas originais do Obsidian diretamente pelo painel de chat.
-* **[ ] Visão Multimodal:** Enviar streams de câmera ou capturas de tela para que o Odin consiga te auxiliar de forma visual.
+* [ ] **Integração OpenAI como provedor alternativo nos Workflows** — gpt-4o-mini para Qualifier/Copywriter (créditos existentes)
+* [ ] **Persistência de Leads no Supabase** — CRM pessoal com histórico de workflows e leads qualificados
+* [ ] **Escrita no Vault** — ferramenta `writeObsidianNote` para o Odin criar/editar notas no Obsidian
+* [ ] **Deploy Railway** — Redis (RedisSaver) para checkpointing persistente + HTTPS em produção
+* [ ] **Múltiplos Workflows** — templates reutilizáveis (prospecção, auditoria IA, follow-up)
+* [ ] **Sender Node (Uazapi/Z-API)** — disparo automático de WhatsApp após aprovação humana
+* [ ] **Persistência de Conversas** — múltiplos chats com histórico salvo no Supabase
+* [ ] **Visão Multimodal** — enviar imagens/screenshots para análise visual

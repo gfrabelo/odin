@@ -240,8 +240,69 @@ if (isCurrentLeadDisqualified || isCurrentLeadHumanFinished) {
 
 ---
 
-## 5. Próximos Passos & Refinamentos Estratégicos
+## 5. Lição de Engenharia: globalThis e Hot-Reload no Next.js
 
-1. **Scraping Nativo de Google Maps (Apify Integration):** Substituir/complementar o `webSearch` genérico por um scraping direcionado com telefones reais e dados do Google Business.
-2. **Integração WhatsApp (Uazapi / Z-API):** Adicionar um nó `senderNode` que dispara a mensagem após aprovação no `human_review`.
-3. **Persistência de Threads no Supabase:** Salvar o histórico de workflows e leads qualificados no banco de dados para acompanhamento de CRM pessoal no Odin.
+### O Problema:
+Ao usar `MemorySaver` (checkpointer in-memory) com `next dev`, o Next.js faz hot-reload dos módulos a cada edição de arquivo. Isso recriava uma nova instância do `MemorySaver`, **apagando todos os workflows em andamento**. Resultado: 404 ao tentar resumir um workflow interrompido.
+
+### A Solução:
+Armazenar o checkpointer no `globalThis` do Node.js — o mesmo padrão que Next.js recomenda para Prisma, Supabase e outras conexões:
+
+```typescript
+const globalForCheckpointer = globalThis as unknown as {
+  __odinCheckpointer?: BaseCheckpointSaver;
+};
+
+export async function getCheckpointer() {
+  if (globalForCheckpointer.__odinCheckpointer) {
+    return globalForCheckpointer.__odinCheckpointer;
+  }
+  const saver = new MemorySaver();
+  globalForCheckpointer.__odinCheckpointer = saver;
+  return saver;
+}
+```
+
+> 💡 **Regra prática:** Em `next dev`, qualquer singleton que vive em memória (connection pools, caches, checkpointers) deve ser ancorado no `globalThis` para sobreviver ao hot-reload.
+
+---
+
+## 6. Lição de Engenharia: Integração com APIs Externas em Nodes
+
+### Apify Google Maps no Researcher
+Substituímos o `webSearch` genérico pelo Apify Google Maps Scraper (`compass/crawler-google-places`) via endpoint síncrono `run-sync-get-dataset-items`. Isso retorna dados reais com telefone, website, rating e endereço direto do Google Maps.
+
+**Padrão aprendido:** Sempre implementar com **fallback gracioso**:
+```
+Apify (dados reais) → Tavily (busca web) → Mock (offline)
+```
+
+### wa.me como "Sender" Simplificado
+Em vez de integrar uma API de WhatsApp (Uazapi/Z-API), usamos o deep-link `https://wa.me/{phone}?text={encodedMessage}` que abre o WhatsApp Web/App direto com a mensagem pronta. Zero infraestrutura adicional, zero custo, 1 clique para enviar.
+
+**Lição:** Nem todo problema precisa de uma API complexa. Um link bem construído pode ser a solução mais elegante.
+
+---
+
+## 7. Resumo dos Padrões Extraídos
+
+| Padrão | Aplicação no Odin |
+|--------|------------------|
+| **Supervisor Determinístico** | Regras em código para rotação de leads, limpeza de estado e terminação |
+| **LLM para Cognição** | Qualifier (scoring), Copywriter (redação), Researcher (extração) |
+| **Fallback em Cascata** | Apify → Tavily → Mock; Redis → MemorySaver |
+| **globalThis Singleton** | Checkpointer sobrevive ao hot-reload do Next.js |
+| **HITL via interrupt()** | Pausa antes de ação externa, resume com Command |
+| **SSE Streaming** | Eventos em tempo real para a UI sem WebSocket |
+| **wa.me Deep-Link** | Ação externa sem API adicional |
+
+---
+
+## 8. Próximos Passos
+
+- [ ] **OpenAI como provedor alternativo nos Workflows** — gpt-4o-mini para reduzir custo
+- [ ] **Persistência de Leads no Supabase** — CRM pessoal com histórico de prospecção
+- [ ] **Deploy Railway + Redis** — RedisSaver para checkpointing em produção
+- [ ] **Templates de Workflow** — workflows reutilizáveis (prospecção, auditoria IA, follow-up)
+- [ ] **Sender Node** — disparo automático de WhatsApp via API (Uazapi/Z-API)
+
