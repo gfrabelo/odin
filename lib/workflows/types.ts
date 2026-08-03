@@ -75,6 +75,20 @@ export interface QualificationResult {
   opportunities: string[];
 }
 
+/** Lead + qualificação unificados — um item da tabela de resultados. */
+export interface QualifiedLead extends LeadInfo {
+  /** Score de qualificação (0-10). */
+  score: number;
+  /** O lead é qualificado para abordagem? */
+  qualified: boolean;
+  /** Justificativa do score. */
+  reasoning: string;
+  /** Oportunidades identificadas. */
+  opportunities: string[];
+  /** Link wa.me pronto com telefone (null se sem phone). */
+  whatsappLink: string | null;
+}
+
 /** Uma mensagem interna do workflow (diferente do Message do chat). */
 export interface WorkflowMessage {
   /** Qual agente enviou. */
@@ -124,13 +138,19 @@ export const WorkflowState = Annotation.Root({
     default: () => [],
   }),
 
-  /** Índice do lead atualmente sendo processado. */
+  /** Leads qualificados em batch (replace — qualifier substitui tudo de uma vez). */
+  qualifiedLeads: Annotation<QualifiedLead[]>({
+    reducer: (_, y) => y,
+    default: () => [],
+  }),
+
+  /** Índice do lead atualmente sendo processado (legacy, usado no incremento 2). */
   currentLeadIndex: Annotation<number>({
     reducer: (_, y) => y,
     default: () => 0,
   }),
 
-  /** Resultado da qualificação do lead atual. */
+  /** Resultado da qualificação do lead atual (legacy, usado no incremento 2). */
   qualification: Annotation<QualificationResult | null>({
     reducer: (_, y) => y,
     default: () => null,

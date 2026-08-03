@@ -259,52 +259,96 @@ export function WorkflowPanel() {
         })}
       </div>
 
-      {/* Human Review Panel */}
+      {/* Lead Table (Human Review v2) */}
       {status === "waiting_human" && interruptPayload && (
         <div className="workflow-review">
           <h3 className="workflow-review-title">
-            👤 Revisão Humana Necessária
+            📊 Leads Qualificados
+            {interruptPayload.totalFound != null && (
+              <span style={{ fontWeight: 400, fontSize: "0.8rem", marginLeft: "0.5rem", color: "rgba(255,255,255,0.5)" }}>
+                {(interruptPayload.totalQualified as number) ?? 0} de {(interruptPayload.totalFound as number) ?? 0} encontrados
+              </span>
+            )}
           </h3>
 
-          <div className="workflow-review-lead">
-            <p>
-              <strong>Lead:</strong>{" "}
-              {(interruptPayload.leadName as string) ?? "—"} (
-              {(interruptPayload.leadSegment as string) ?? "—"})
-              {(interruptPayload.googleMapsUrl as string) && (
-                <a
-                  href={interruptPayload.googleMapsUrl as string}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="workflow-link"
-                  style={{ marginLeft: "0.5rem" }}
-                >
-                  📍 Ver no Maps
-                </a>
-              )}
-            </p>
-            <p>
-              <strong>Score:</strong>{" "}
-              {(interruptPayload.qualificationScore as number) ?? 0}/10
-              {(interruptPayload.leadPhone as string) && (
-                <span style={{ marginLeft: "0.75rem", color: "rgba(255,255,255,0.5)" }}>
-                  📞 {interruptPayload.leadPhone as string}
-                </span>
-              )}
-            </p>
-            {(interruptPayload.opportunities as string[])?.length > 0 && (
-              <p>
-                <strong>Oportunidades:</strong>{" "}
-                {(interruptPayload.opportunities as string[]).join(", ")}
-              </p>
-            )}
-          </div>
+          <div className="workflow-lead-table-wrap">
+            <table className="workflow-lead-table">
+              <thead>
+                <tr>
+                  <th>Lead</th>
+                  <th>Segmento</th>
+                  <th>Score</th>
+                  <th>Oportunidades</th>
+                  <th>Contato</th>
+                </tr>
+              </thead>
+              <tbody>
+                {((interruptPayload.leads as Array<Record<string, unknown>>) ?? []).map(
+                  (lead, i) => {
+                    const score = (lead.score as number) ?? 0;
+                    const scoreColor =
+                      score >= 7 ? "#34d399" : score >= 4 ? "#fbbf24" : "#f87171";
 
-          <div className="workflow-review-draft">
-            <h4>Mensagem de abordagem:</h4>
-            <pre className="workflow-review-message">
-              {(interruptPayload.outreachDraft as string) ?? ""}
-            </pre>
+                    return (
+                      <tr key={i}>
+                        <td>
+                          <div className="workflow-lead-name">
+                            {(lead.name as string) ?? "—"}
+                            {(lead.googleMapsUrl as string) && (
+                              <a
+                                href={lead.googleMapsUrl as string}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="workflow-link"
+                                title="Ver no Google Maps"
+                              >
+                                📍
+                              </a>
+                            )}
+                          </div>
+                          {(lead.location as string) && (
+                            <span className="workflow-lead-location">
+                              {lead.location as string}
+                            </span>
+                          )}
+                        </td>
+                        <td>{(lead.segment as string) ?? "—"}</td>
+                        <td>
+                          <span className="workflow-lead-score" style={{ color: scoreColor }}>
+                            {score}/10
+                          </span>
+                        </td>
+                        <td>
+                          <span className="workflow-lead-opps">
+                            {((lead.opportunities as string[]) ?? []).join(", ") || "—"}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="workflow-lead-actions">
+                            {(lead.whatsappLink as string) ? (
+                              <a
+                                href={lead.whatsappLink as string}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="workflow-btn-sm workflow-btn--whatsapp"
+                                title="Abrir WhatsApp"
+                              >
+                                📲
+                              </a>
+                            ) : (
+                              <span className="workflow-lead-no-phone">—</span>
+                            )}
+                            {(lead.phone as string) && (
+                              <span className="workflow-lead-phone">{lead.phone as string}</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+                )}
+              </tbody>
+            </table>
           </div>
 
           <div className="workflow-review-actions">
@@ -312,40 +356,8 @@ export function WorkflowPanel() {
               onClick={() => resumeWorkflow("approve")}
               className="workflow-btn workflow-btn--approve"
             >
-              ✅ Aprovar
+              ✅ Concluir
             </button>
-            {(interruptPayload.whatsappLink as string) && (
-              <a
-                href={interruptPayload.whatsappLink as string}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="workflow-btn workflow-btn--whatsapp"
-              >
-                📲 Enviar no WhatsApp
-              </a>
-            )}
-            <button
-              onClick={() => resumeWorkflow("reject")}
-              className="workflow-btn workflow-btn--reject"
-            >
-              ❌ Rejeitar
-            </button>
-            <div className="workflow-review-edit">
-              <input
-                type="text"
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Feedback para reescrita..."
-                className="workflow-input workflow-input--small"
-              />
-              <button
-                onClick={() => resumeWorkflow("edit")}
-                disabled={!feedback.trim()}
-                className="workflow-btn workflow-btn--edit"
-              >
-                ✏️ Revisar
-              </button>
-            </div>
           </div>
         </div>
       )}

@@ -1,136 +1,77 @@
 /**
- * Odin Workflows — Node: Human Review
+ * Odin Workflows — Node: Human Review (Lead Table v2)
  *
- * ─── CONCEITO 5: Human-in-the-Loop ─────────────────────────────────
- * Este é o conceito mais poderoso do LangGraph para produção real.
+ * Na pipeline v2, o Human Review exibe uma TABELA de todos os leads
+ * qualificados (filtrado: só qualified === true) usando interrupt().
  *
- * A função `interrupt()` faz o grafo PAUSAR. O estado é salvo no
- * checkpointer (MemorySaver ou Redis) e a execução para. O endpoint
- * retorna um evento "interrupt" para a UI, que mostra o draft e
- * botões de aprovação/rejeição.
+ * O payload do interrupt contém:
+ *  - type: "lead_table" (identifica o formato para a UI)
+ *  - leads: QualifiedLead[] (array com scores + links wa.me)
+ *  - totalFound / totalQualified (contadores para contexto)
  *
- * Quando o humano decide, o endpoint recebe a decisão e RE-INVOCA
- * o grafo com o mesmo thread_id. O LangGraph carrega o estado salvo
- * e CONTINUA de onde parou — a função `interrupt()` retorna o valor
- * que o humano enviou.
- *
- * Tradeoff de usar vs. não usar:
- *  - SEM interrupt: o workflow roda do início ao fim sem parar.
- *    Serve para pipelines automatizados (ETL, indexação). Mas para
- *    prospecção, mandar mensagem errada QUEIMA o lead. Inaceitável.
- *  - COM interrupt: o workflow para antes da ação destrutiva (enviar
- *    mensagem), dá controle ao humano, e só continua com aprovação.
- *    Mais lento, mas seguro.
- *
- * No Odin: SEMPRE pausar antes de qualquer ação que afete o mundo
- * externo (enviar mensagem, salvar no vault, publicar).
- * ────────────────────────────────────────────────────────────────────
+ * O humano vê a tabela, analisa, e clica "Concluir" para encerrar.
+ * No futuro (Incremento 2), poderá selecionar leads para gerar mensagens.
  */
 
 import { interrupt } from "@langchain/langgraph";
-import type { OdinWorkflowState, WorkflowMessage } from "../types";
+import type { OdinWorkflowState, WorkflowMessage, QualifiedLead } from "../types";
 
-/** Payload enviado ao humano quando o workflow pausa. */
-interface HumanReviewPayload {
-  leadName: string;
-  leadSegment: string;
-  leadPhone: string | null;
-  qualificationScore: number;
-  opportunities: string[];
-  outreachDraft: string;
-  revisionCount: number;
-  /** Link wa.me pronto para enviar a mensagem (null se sem telefone). */
-  whatsappLink: string | null;
-  /** URL do Google Maps do lead (null se não disponível). */
-  googleMapsUrl: string | null;
-}
-
-/**
- * Gera link https://wa.me/{phone}?text={encodedMessage}
- * O phone deve estar no formato internacional sem "+" (ex: 5513999999999).
- */
-function buildWhatsAppLink(phone: string | null, message: string): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 10) return null;
-  const encodedMessage = encodeURIComponent(message);
-  return `https://wa.me/${digits}?text=${encodedMessage}`;
+/** Payload enviado ao humano quando o workflow pausa na tabela. */
+interface LeadTablePayload {
+  type: "lead_table";
+  /** Leads qualificados (filtrados, sorted by score). */
+  leads: QualifiedLead[];
+  /** Total de leads encontrados pelo Researcher. */
+  totalFound: number;
+  /** Total de leads qualificados. */
+  totalQualified: number;
+  /** Tarefa original. */
+  task: string;
 }
 
 /** Resposta que o humano envia de volta. */
-interface HumanReviewResponse {
-  decision: "approve" | "reject" | "edit";
-  feedback?: string;
-  editedMessage?: string;
+interface HumanResponse {
+  decision: "approve" | "reject";
 }
 
-/**
- * Node de Human Review — pausa o workflow para aprovação humana.
- *
- * 1. Monta o payload com todos os dados relevantes
- * 2. Chama `interrupt()` — o grafo PARA aqui
- * 3. Quando retomado, `interrupt()` retorna a decisão do humano
- * 4. Atualiza o estado com a decisão
- */
 export async function humanReviewNode(
   state: OdinWorkflowState
 ): Promise<Partial<OdinWorkflowState>> {
-  const lead = state.leads[state.currentLeadIndex];
+  const { leads, qualifiedLeads, task } = state;
 
-  if (!lead) {
-    return {
-      humanDecision: "reject",
-      currentAgent: "human_review",
-      messages: [
-        {
-          agent: "human_review",
-          content: "Nenhum lead para revisar.",
-          timestamp: new Date().toISOString(),
-        },
-      ],
-    };
-  }
+  // Filtra: só mostra leads qualificados (qualified === true)
+  const displayLeads = qualifiedLeads.filter((l) => l.qualified);
 
-  console.log(`[Odin Workflow] Human Review: pausando para aprovação de "${lead.name}"`);
-
-  // Monta o payload que a UI vai exibir
-  const payload: HumanReviewPayload = {
-    leadName: lead.name,
-    leadSegment: lead.segment,
-    leadPhone: lead.phone,
-    qualificationScore: state.qualification?.score ?? 0,
-    opportunities: state.qualification?.opportunities ?? [],
-    outreachDraft: state.outreachDraft,
-    revisionCount: state.revisionCount,
-    whatsappLink: buildWhatsAppLink(lead.phone, state.outreachDraft),
-    googleMapsUrl: lead.googleMapsUrl ?? null,
+  const payload: LeadTablePayload = {
+    type: "lead_table",
+    leads: displayLeads,
+    totalFound: leads.length,
+    totalQualified: displayLeads.length,
+    task,
   };
 
   // ══════════════════════════════════════════════════════════════
-  // INTERRUPT — O grafo PARA aqui e salva o estado.
-  //
-  // O valor retornado por interrupt() é o que o humano enviar
-  // quando retomar o workflow (via PUT /api/workflow).
+  //  interrupt() — pausa o workflow e envia o payload para a UI.
+  //  Quando o humano responde (via PUT /api/workflow), o LangGraph
+  //  retoma a execução e o valor retornado por interrupt() é a
+  //  resposta do humano.
   // ══════════════════════════════════════════════════════════════
-  const humanResponse = interrupt(payload) as HumanReviewResponse;
 
-  // Quando o humano retoma, a execução continua aqui ↓
+  const humanResponse = interrupt(payload) as HumanResponse;
+
+  const decision = humanResponse.decision ?? "approve";
 
   const logMessage: WorkflowMessage = {
     agent: "human_review",
-    content: `Decisão humana: ${humanResponse.decision}${humanResponse.feedback ? ` — "${humanResponse.feedback}"` : ""}`,
+    content: `Revisão concluída: ${decision === "approve" ? "✅ Tabela aprovada" : "❌ Descartada"}. ${displayLeads.length} leads qualificados revisados.`,
     timestamp: new Date().toISOString(),
   };
 
-  console.log(`[Odin Workflow] Human Review: decisão = ${humanResponse.decision}`);
+  console.log(`[Odin Workflow] Human Review: ${decision} (${displayLeads.length} leads na tabela)`);
 
   return {
-    humanDecision: humanResponse.decision,
-    feedback: humanResponse.feedback ?? "",
-    humanEditedMessage: humanResponse.editedMessage ?? "",
-    approved: humanResponse.decision === "approve",
+    humanDecision: decision,
     currentAgent: "human_review",
-    status: "running",
     messages: [logMessage],
   };
 }
