@@ -17,6 +17,37 @@ type: wiki
 
 ---
 
+> ### ⚠️ Como ler este documento (atualizado em 2026-08-11)
+>
+> Este é um **documento didático** — ele ensina LangGraph usando o Odin como caso.
+> Ele **não é mais a fonte canônica das decisões de arquitetura**. As decisões que
+> estavam dissolvidas aqui foram extraídas para ADRs, onde carregam status, alternativas
+> descartadas e gatilho de revisão:
+>
+> | O que estava aqui | Agora vive em |
+> |---|---|
+> | §4 — Bug do loop infinito de estado | [ADR-0003 — Supervisor determinístico](./docs/adr/0003-supervisor-deterministico.md) |
+> | §5 — `globalThis` e hot-reload | ADR-0005 ([índice](./docs/adr/README.md)) |
+> | §6 — Fallbacks em cascata | [ADR-0004 — Fallbacks em cascata](./docs/adr/0004-fallbacks-em-cascata.md) |
+> | §6 — `wa.me` como sender | ADR-0007 ([índice](./docs/adr/README.md)) |
+>
+> **Duas coisas descritas aqui não correspondem mais ao código:**
+>
+> 1. **A rotação lead-a-lead da §4 foi aposentada.** O código da "solução" mostrado ali
+>    (com `currentLeadIndex++`) é histórico: o pipeline hoje qualifica **todos os leads
+>    numa chamada em batch**, e `currentLeadIndex` é campo legado. A *lição* segue
+>    valendo integralmente — só a implementação mudou.
+> 2. **O Copywriter não é roteado.** Ele aparece nos diagramas como parte do fluxo, mas
+>    o supervisor nunca aponta para ele. Ver [`docs/ESTADO.md`](./docs/ESTADO.md) §2.
+>
+> Para o estado real do sistema, use sempre [`docs/ESTADO.md`](./docs/ESTADO.md).
+>
+> **Sobre a §1 abaixo:** ela argumenta por que grafos, mas não diz quando *não* usá-los —
+> e essa é a parte que faltava. O critério está em
+> [ADR-0009 — A Regra do Turno](./docs/adr/0009-regra-do-turno.md).
+
+---
+
 ## 1. Visão Geral: Por que Grafos Estaduais?
 
 Em aplicações simples de IA, um único prompt com *Function Calling* em loop (ex: `while (hasToolCalls)`) costuma bastar. No entanto, para tarefas complexas como prospecção B2B (pesquisar → qualificar → escrever → revisar → aprovar), a abordagem de prompt único falha por 3 motivos:

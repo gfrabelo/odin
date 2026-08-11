@@ -4,8 +4,20 @@
 > roadmap e decisões em aberto do Odin. Feito para ser **carregado como contexto em qualquer
 > LLM** — seja para desenvolver o projeto, seja para pedir feedback crítico.
 >
-> **Autor:** Gabriel Rabelo · **Última atualização:** 2026-07-08
+> **Autor:** Gabriel Rabelo · **Última atualização:** 2026-08-11
 > **Estado do produto:** protótipo pessoal funcional (single-user), em evolução ativa.
+>
+> **Escopo deste documento:** propósito, usuário, princípios e decisões em aberto.
+> Ele **não** é mais a fonte do estado técnico nem das decisões fechadas:
+>
+> | Pergunta | Documento |
+> |---|---|
+> | O que existe / falta / está ambíguo, verificado no código | [`ESTADO.md`](./ESTADO.md) |
+> | Por que foi decidido assim, e o que foi descartado | [`adr/`](./adr/) |
+> | O que vem depois, sequenciado | [`BACKLOG.md`](./BACKLOG.md) |
+>
+> Se este documento divergir do `ESTADO.md`, **o `ESTADO.md` está certo** — ele descreve
+> o código, este descreve a intenção.
 
 ---
 
@@ -85,28 +97,27 @@ maior decisão em aberto: continuar pessoal vs. virar produto).
 
 ---
 
-## 4. Estado Atual — O que já funciona (v0)
+## 4. Estado Atual
 
-| # | Capacidade | Estado |
-|---|---|---|
-| 1 | **Cockpit imersivo** — robô 3D (Spline) em tela cheia, glass UI, shader de fundo, HUD lateral | ✅ |
-| 2 | **Chat em streaming** com Gemini (markdown, stop/abort, histórico em memória) | ✅ |
-| 3 | **RAG** sobre o vault Obsidian (pgvector), fail-safe, com citações `[n]` | ✅ |
-| 4 | **Sync incremental** `wiki/ → Supabase` (hash por arquivo) + auto-sync via git hook | ✅ |
-| 5 | **Voz — entrada (STT):** Web Speech (pt-BR), transcrição ao vivo, auto-envio na pausa | ✅ |
-| 6 | **Voz — saída (TTS):** OpenAI (`onyx`, 1.15x), fila por frase | ✅ |
-| 7 | **Modo conversa contínua** (hands-free, meia-duplex, sem eco) + barge-in (rede de segurança) | ✅ |
-| 8 | **Glow Pulse** — anel neon pulsa no ritmo da voz, passando atrás da cabeça do robô (profundidade 3D) | ✅ |
-| 9 | **Function calling** — loop de tools no servidor (4 ferramentas, ver §6) | ✅ |
-| 10 | **Fallback de provider** — Gemini primário; OpenAI (`gpt-4o-mini`) assume em erro/rate-limit | ✅ |
-| 11 | **Retry/backoff** exponencial p/ erros transitórios do Gemini (429/503) | ✅ |
-| 12 | **Chips de follow-up** — após cada resposta, 3 sugestões clicáveis (structured output) | ✅ |
+> **Movido.** A tabela de capacidades vive agora em [`ESTADO.md`](./ESTADO.md) §1, com
+> citação de `arquivo:linha` para cada linha, e §2 lista o que falta. Foi movido porque
+> esta seção ficou desatualizada entre `6b7ba86` e a auditoria de 2026-08-11 — descrevendo
+> um pipeline que não existia mais.
+>
+> Manter estado técnico em dois lugares garante que um dos dois vai mentir. Este documento
+> ficou com a intenção; o `ESTADO.md` ficou com o fato.
 
-**Limitações conhecidas (v0):**
-- Sem persistência: refresh limpa a conversa (só estado React).
+**Resumo de uma linha:** cockpit de IA pessoal funcional — chat em streaming com RAG sobre
+o vault, voz bidirecional, function calling com 4 tools, e um workflow LangGraph de
+prospecção B2B com revisão humana.
+
+**Limitações estruturais (as que definem o que o produto é hoje):**
+- Single-user, sem auth, roda local.
+- Sem persistência de conversa: refresh limpa o histórico.
 - Sem multimodal de **entrada** (não vê imagens/PDF/tela).
 - Voz é um "Frankenstein" (STT nativo + TTS OpenAI + meia-duplex), não voz nativa full-duplex.
-- Single-user, sem auth, roda local.
+- O workflow de prospecção **não gera a mensagem de abordagem** — o nó Copywriter existe e
+  não é roteado. Ver [`ESTADO.md`](./ESTADO.md) §2.1.
 
 ---
 
@@ -261,33 +272,55 @@ Candidatos discutidos, agrupados. Todos se plugam no contrato existente sem queb
 
 ---
 
-## 9. Decisões Estratégicas em Aberto (a parte para debater com outras LLMs)
+## 9. Decisões Estratégicas em Aberto
 
 > **Estas são as perguntas em que quero feedback variado.** Não há resposta certa ainda.
+
+### Fechadas desde a última versão
+
+Duas perguntas que estavam aqui foram respondidas em 2026-08-11 e viraram ADR:
+
+- **"Um cérebro ou um agente por domínio?"** → [ADR-0008](./adr/0008-um-cerebro-nao-cinco.md).
+  Um cérebro. "Domínio" é metadado de recuperação, não fronteira de agente — a proposta
+  confundia três eixos independentes e resolvia com arquitetura um problema de filtro.
+- **"Quais problemas merecem um workflow LangGraph?"** → [ADR-0009](./adr/0009-regra-do-turno.md).
+  A Regra do Turno. Aplicada aos domínios propostos, **1 de 6** justifica um grafo — e ele
+  já existe.
+
+### Ainda em aberto
 
 1. **Pessoal vs. Produto.** Odin deve continuar um cockpit single-user (otimizado 100% para o
    Gabriel), virar um **produto multi-tenant**, ou um **open-source/template** que outros
    clonam e plugam no próprio vault? Isso muda quase todas as outras decisões (auth, custo,
-   privacidade, arquitetura).
+   privacidade, arquitetura). *Aberta desde julho; trava o argumento de portfólio, porque
+   "protótipo pessoal" e "produto" pedem demos diferentes.*
 
 2. **Próximo salto: profundidade vs. amplitude.** Investir em **voz nativa (Gemini Live)** —
    tornar a experiência atual excelente — ou em **novas capacidades** (visão, memória,
-   integrações) — cobrir mais superfície? Qual entrega mais valor por hora de trabalho?
+   integrações)? *Nota de 2026-08-11: enquanto caixa for a restrição ativa, nenhuma das
+   duas ganha do T1 do [`BACKLOG.md`](./BACKLOG.md) — ambas são impacto de imersão, não de
+   receita.*
 
 3. **Quebrar o fluxo unidirecional?** Hoje o Odin só **lê** o cérebro. Deixá-lo **escrever**
-   (`writeObsidianNote`, capturar decisões, criar notas) o torna um parceiro ativo — mas
-   arrisca a integridade da "única fonte de verdade". Vale? Com quais salvaguardas?
+   (`writeObsidianNote`) o torna um parceiro ativo — mas **revoga o
+   [ADR-0002](./adr/0002-vault-fonte-de-verdade.md)**, não o estende. Se for aceito, precisa
+   de um ADR que substitua aquele; a alternativa mais defensável já registrada lá é uma área
+   de staging (`inbox/`) com ritual de revisão.
 
 4. **Memória: onde e como.** Persistência simples (threads no Supabase) resolve o básico. Uma
-   "memória de longo prazo" de verdade (o Odin aprende preferências, fatos, padrões) é bem mais
-   complexa. Qual o nível certo agora?
+   "memória de longo prazo" de verdade é bem mais complexa. Qual o nível certo agora?
 
 5. **Diferencial defensável.** Se qualquer um pode montar um "chat + RAG + voz", qual é o fosso
-   do Odin? É a **integração profunda com o segundo cérebro do Gabriel** (dado proprietário)?
-   A **experiência/imersão**? A **orquestração multi-modelo**? Onde dobrar a aposta?
+   do Odin? É a **integração profunda com o segundo cérebro** (dado proprietário)? A
+   **experiência/imersão**? A **orquestração**? Onde dobrar a aposta?
 
-6. **Custo & sustentabilidade.** Uso pessoal com Gemini/OpenAI/Supabase é barato. Se escalar
-   (voz nativa ~contínua, mais usuários), o custo muda de figura. Quando isso vira restrição?
+6. **Custo & sustentabilidade.** Uso pessoal é barato. Se escalar (voz contínua, mais
+   usuários), o custo muda de figura. Quando isso vira restrição?
+
+7. **Degradação silenciosa é feature ou bug?** *(nova)* O [ADR-0004](./adr/0004-fallbacks-em-cascata.md)
+   garante que nada derruba a conversa — e o efeito colateral é que o sistema nunca avisa
+   que está respondendo pior. A busca web ficou em modo mock por semanas sem ninguém notar.
+   Avisar sempre? Ou recusar, em vez de fingir, quando a capacidade é factual?
 
 ---
 

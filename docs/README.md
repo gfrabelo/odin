@@ -1,10 +1,43 @@
 # 📚 Documentação do Odin
 
-Duas documentações vivas - atualizadas a cada etapa do projeto.
+Cada documento responde **uma** pergunta. Se você não sabe onde escrever algo, é porque
+ainda não sabe qual pergunta está respondendo.
 
-| Doc | Pra quem | Quando usar |
+| Doc | Responde | Pra quem |
 |---|---|---|
-| **[GUIA-DIDATICO.md](./GUIA-DIDATICO.md)** | Humanos (e roteiro de YouTube) | Entender *como* e *por que* cada peça funciona, com analogias. Linguagem de leigo. |
-| **[PRD.md](./PRD.md)** | LLMs / dev | Carregar como contexto ao trabalhar no código ou pedir feedback de produto. Reúne propósito, produto, arquitetura técnica, estado atual, roadmap e decisões em aberto. |
+| **[ESTADO.md](./ESTADO.md)** | **O que** existe, falta e está ambíguo — hoje | Qualquer um antes de planejar. Toda afirmação cita `arquivo:linha` |
+| **[adr/](./adr/)** | **Por que** foi decidido assim, e o que foi descartado | Você daqui a seis meses. E entrevistador |
+| **[PRD.md](./PRD.md)** | **Para que** o Odin existe — propósito, usuário, princípios | LLM carregando contexto; feedback de produto |
+| **[BACKLOG.md](./BACKLOG.md)** | **O que vem depois**, sequenciado por impacto | Quando sobrar tempo e faltar clareza |
+| **[EVAL.md](./EVAL.md)** | **Como saber** se o agente está bom | Antes de mexer em qualquer prompt |
+| **[GUIA-DIDATICO.md](./GUIA-DIDATICO.md)** | **Como explicar** para quem não é da área | Roteiro de vídeo; leigos |
+| **[../LANGGRAPH_MULTI_AGENT_GUIDE.md](../LANGGRAPH_MULTI_AGENT_GUIDE.md)** | Material didático sobre LangGraph | Estudo. As *decisões* que estavam nele agora vivem em `adr/` |
 
-**Regra:** a cada feature nova (voz, visão, ações…), atualizar **as duas** - o conceito didático no guia, o estado técnico e de produto no PRD.
+---
+
+## Regras de manutenção
+
+**Ao entregar uma feature:** atualize o `ESTADO.md` (§1 ganha linha, §2 perde linha) e o
+`GUIA-DIDATICO.md` (o conceito, em linguagem de leigo).
+
+**Ao tomar uma decisão que tinha alternativa:** escreva um ADR. Se não havia alternativa,
+não é decisão — é fato, e fato mora no `ESTADO.md`.
+
+**Ao fechar uma ambiguidade** do `ESTADO.md` §3: escreva o ADR e remova o item.
+
+**Quando o `ESTADO.md` e o `PRD.md` divergirem:** o `ESTADO.md` está certo. Ele descreve o
+código; o PRD descreve a intenção. Intenção desatualizada é normal — descrição
+desatualizada é mentira.
+
+## A regra que este projeto aprendeu do jeito difícil
+
+Em 2026-08-11 uma auditoria encontrou o `README.md` afirmando cinco features que o código
+não tinha — incluindo "link WhatsApp com mensagem pré-carregada", quando o `?text=` nunca
+existiu. Nenhuma foi mentira deliberada: o código andou e a documentação não.
+
+**Documentação que promete mais do que o código entrega é pior que documentação nenhuma**,
+porque quem conferir não vai concluir "está desatualizado" — vai concluir "esse cara
+exagera". Num projeto que também é portfólio, esse é o pior resultado possível.
+
+Daí o `ESTADO.md` e a regra de citar `arquivo:linha`: um documento que só afirma o que dá
+para conferir abrindo o arquivo.

@@ -56,33 +56,37 @@ Módulo de orquestração de agentes especialistas usando **LangGraph.js** com p
 graph LR
     S[🧠 Supervisor] --> R[🔍 Researcher]
     S --> Q[📊 Qualifier]
-    S --> C[✍️ Copywriter]
     S --> H[👤 Human Review]
+    S -.não roteado hoje.-> C[✍️ Copywriter]
     R --> S
     Q --> S
-    C --> S
     H --> S
+    C -.-> S
 ```
+
+> ⚠️ **Estado real:** o caminho que executa hoje é `researcher → qualifier → human_review`.
+> O nó **Copywriter existe no grafo mas o Supervisor nunca roteia para ele** — a aresta
+> pontilhada é intencional neste diagrama. Ver [`docs/ESTADO.md`](./docs/ESTADO.md) §2.
 
 #### Agentes Especialistas
 
-| Agente | Papel | Tecnologia |
-|--------|-------|------------|
-| **Supervisor** | Roteador determinístico — gerencia estado, rotação de leads e transições | Regras TypeScript (sem LLM) |
-| **Researcher** | Pesquisa leads reais com dados estruturados | Apify Google Maps Scraper (fallback: Tavily) |
-| **Qualifier** | Avalia cada lead (score 0-10, oportunidades) | Gemini 3.5 Flash + Structured Output |
-| **Copywriter** | Escreve mensagem WhatsApp (máx. 5 linhas, tom inferido do segmento) | Gemini 3.5 Flash + prompt battle-tested |
-| **Human Review** | Pausa o workflow via `interrupt()` para aprovação humana | LangGraph HITL |
+| Agente | Papel | Tecnologia | Estado |
+|--------|-------|------------|--------|
+| **Supervisor** | Roteador determinístico — decide o próximo estágio a partir do estado | Regras TypeScript (sem LLM) | ✅ ativo |
+| **Researcher** | Pesquisa leads reais com dados estruturados | Apify Google Maps Scraper (fallback: Tavily → mock) | ✅ ativo |
+| **Qualifier** | Avalia todos os leads de uma vez (score 0-10, oportunidades) | Gemini 3.5 Flash + Structured Output | ✅ ativo |
+| **Copywriter** | Escreveria a mensagem WhatsApp (máx. 5 linhas, tom inferido do segmento) | Gemini 3.5 Flash + prompt battle-tested | ⚠️ **inalcançável** — prompt pronto, nó nunca executa |
+| **Human Review** | Pausa o workflow via `interrupt()` para revisão humana | LangGraph HITL | ✅ ativo |
 
 #### Funcionalidades do Workflow
 
 * **Apify Google Maps Integration:** Dados reais de empresas (nome, telefone, website, rating, endereço, URL do Maps).
-* **Human-in-the-Loop:** Revisão com botões Aprovar / Rejeitar / Revisar antes de qualquer ação externa.
-* **Link wa.me:** Botão "📲 Enviar no WhatsApp" gera link `https://wa.me/{phone}?text={mensagem}` com a mensagem pronta.
+* **Human-in-the-Loop:** O workflow pausa via `interrupt()` e exibe a tabela de leads antes de qualquer ação externa. Hoje a UI oferece apenas **Concluir** (`approve`) — os caminhos `reject`/`edit` existem no backend sem gatilho na interface.
 * **Link Google Maps:** "📍 Ver no Maps" para cada lead.
+* **Link wa.me:** "📲 WhatsApp" abre a conversa com o número já normalizado (`https://wa.me/{phone}`). ⚠️ **Sem mensagem pré-carregada** — o `?text=` depende do Copywriter, que ainda não é roteado.
 * **Streaming SSE:** Progresso em tempo real (qual agente está rodando, resultados parciais, interrupções).
-* **Checkpointing:** MemorySaver (dev, `globalThis` singleton) com fallback para Redis (produção).
-* **Rotação Determinística de Leads:** Supervisor avança automaticamente para o próximo lead após aprovação/rejeição, com limpeza de estado e encerramento ao processar todos os leads.
+* **Checkpointing:** MemorySaver (dev, `globalThis` singleton). O caminho Redis existe em código mas o pacote não está instalado — hoje é sempre MemorySaver.
+* **Qualificação em batch:** uma única chamada estruturada qualifica todos os leads e os ordena por score. Substituiu o desenho anterior de rotação lead-a-lead (ver [ADR-0006](./docs/adr/README.md)).
 
 ### 5. Engenharia de Chat Robusta & Agnóstica ⚡
 
@@ -197,21 +201,35 @@ npm run sync
 * [x] Glow Pulse sincronizado com voz (Web Audio AnalyserNode)
 * [x] Barge-in inteligente
 * [x] UI imersiva com robô 3D (Spline), glass UI, background WebGL
-* [x] **Workflows Multi-Agente (LangGraph.js)** — Supervisor, Researcher, Qualifier, Copywriter, Human Review
+* [x] **Workflow Multi-Agente (LangGraph.js)** — grafo hub-and-spoke com supervisor determinístico
 * [x] **Apify Google Maps Scraper** — leads reais com telefone, website, rating
-* [x] **Copywriter battle-tested** — máx. 5 linhas, tom inferido, zero linguagem corporativa
-* [x] **Human-in-the-loop** — interrupt/resume com checkpointing
-* [x] **Link wa.me** — botão WhatsApp com mensagem pré-carregada
-* [x] **Rotação determinística de leads** — avanço automático + limpeza de estado
+* [x] **Qualificação em batch** — uma chamada estruturada qualifica e ranqueia todos os leads
+* [x] **Human-in-the-loop** — `interrupt()`/resume com checkpointing
+* [x] **Link wa.me** — botão que abre a conversa com o número normalizado
 * [x] **Fail-safe em cascata** — Apify → Tavily → mock; Supabase offline → RAG silencioso
+
+> Para o retrato completo e verificado — incluindo o que **não** funciona — ver
+> [`docs/ESTADO.md`](./docs/ESTADO.md). Este checklist lista entregas; aquele documento
+> lista lacunas, com `arquivo:linha`.
 
 ## 🗺️ Roadmap
 
-* [ ] **Integração OpenAI como provedor alternativo nos Workflows** — gpt-4o-mini para Qualifier/Copywriter (créditos existentes)
-* [ ] **Persistência de Leads no Supabase** — CRM pessoal com histórico de workflows e leads qualificados
-* [ ] **Escrita no Vault** — ferramenta `writeObsidianNote` para o Odin criar/editar notas no Obsidian
-* [ ] **Deploy Railway** — Redis (RedisSaver) para checkpointing persistente + HTTPS em produção
-* [ ] **Múltiplos Workflows** — templates reutilizáveis (prospecção, auditoria IA, follow-up)
-* [ ] **Sender Node (Uazapi/Z-API)** — disparo automático de WhatsApp após aprovação humana
-* [ ] **Persistência de Conversas** — múltiplos chats com histórico salvo no Supabase
-* [ ] **Visão Multimodal** — enviar imagens/screenshots para análise visual
+**Destrava caixa (próximo)**
+* [ ] **Rotear o Copywriter** — o prompt está pronto e o nó nunca executa. Sem isso o pipeline entrega tabela sem mensagem
+* [ ] **`?text=` no link wa.me** — a mensagem gerada entra no deep-link, editável antes de enviar
+* [ ] **Persistência de Leads no Supabase** — CRM pessoal com histórico; sem isso o mesmo negócio é re-abordado
+* [ ] **Guarda de loop no researcher** — contador de tentativas + `recursionLimit` explícito
+
+**Destrava credibilidade**
+* [ ] **Harness de evals** — aderência do copywriter às regras, consistência do qualifier, recall do RAG
+* [ ] **`typecheck` + CI** — lint, typecheck e build no push
+* [ ] **Recuperação escopada por domínio** — parsear frontmatter no sync (ver [ADR-0010](./docs/adr/0010-metadado-do-frontmatter.md))
+
+**Depois**
+* [ ] **Deploy Railway + Redis** — checkpointing persistente + HTTPS
+* [ ] **Persistência de Conversas** — múltiplos chats com histórico
+* [ ] **Visão Multimodal** — enviar imagens/screenshots para análise
+* [ ] **Escrita no Vault** (`writeObsidianNote`) — ⚠️ revoga o [ADR-0002](./docs/adr/0002-vault-fonte-de-verdade.md); exige decisão explícita antes
+
+**Descartado**
+* ~~Sender Node (Uazapi/Z-API)~~ — o `wa.me` + clique humano é melhor até o volume exigir: custo zero, risco de ban zero, humano no loop por construção. Ver [ADR-0007](./docs/adr/README.md)
