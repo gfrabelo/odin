@@ -12,6 +12,7 @@
 
 import { getGemini } from "@/lib/ai/client";
 import { QUALIFIER_PROMPT } from "../prompts";
+import { buildWhatsAppLink } from "../whatsapp";
 import type {
   OdinWorkflowState,
   QualifiedLead,
@@ -21,15 +22,11 @@ import type {
 const QUALIFIER_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 
 /**
- * Gera link https://wa.me/{phone}?text={greeting}
- * Mensagem padrão curta — a real será gerada pelo Copywriter no futuro.
+ * Corte de qualificação. Vive aqui, em código, porque o prompt declara a
+ * mesma regra em prosa e nada reconciliava as duas fontes — o modelo podia
+ * devolver score 8 com `qualified: false` e o lead sumia da tabela.
  */
-function buildWhatsAppLink(phone: string | null): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 10) return null;
-  return `https://wa.me/${digits}`;
-}
+const QUALIFICATION_THRESHOLD = 6;
 
 export async function qualifierNode(
   state: OdinWorkflowState
@@ -53,19 +50,38 @@ export async function qualifierNode(
 
   console.log(`[Odin Workflow] Qualifier: qualificando ${leads.length} leads em batch`);
 
-  // Monta a descrição de cada lead para o prompt
+  // Monta a descrição de cada lead para o prompt.
+  //
+  // O bloco do site é o que separa esta versão da anterior: antes o modelo
+  // recebia só a URL e mesmo assim a rubrica pedia para julgar se o site era
+  // ruim — ou seja, ele adivinhava. Agora ou vem o conteúdo real, ou vem
+  // explicitamente "não foi possível analisar". Ver ADR-0011.
   const leadsDescription = leads
-    .map(
-      (lead, i) =>
-        `Lead #${i + 1}:
+    .map((lead, i) => {
+      let siteBlock: string;
+      if (!lead.website) {
+        siteBlock = "- Website: NÃO TEM";
+      } else if (lead.siteAnalysis?.ok && lead.siteAnalysis.markdown) {
+        siteBlock =
+          `- Website: ${lead.website}\n` +
+          `- Título do site: ${lead.siteAnalysis.title ?? "sem título"}\n` +
+          `- CONTEÚDO REAL DO SITE:\n"""\n${lead.siteAnalysis.markdown}\n"""`;
+      } else {
+        siteBlock =
+          `- Website: ${lead.website}\n` +
+          `- CONTEÚDO DO SITE: não foi possível analisar` +
+          `${lead.siteAnalysis?.error ? ` (${lead.siteAnalysis.error})` : ""}. ` +
+          `NÃO suponha a qualidade do site.`;
+      }
+
+      return `Lead #${i + 1}:
 - Nome: ${lead.name}
 - Segmento: ${lead.segment}
 - Telefone: ${lead.phone ?? "não informado"}
-- Website: ${lead.website ?? "NÃO TEM"}
 - Localização: ${lead.location ?? "não informado"}
 - Avaliação Google: ${lead.rating ?? "não informado"}
-- Fonte: ${lead.source}`
-    )
+${siteBlock}`;
+    })
     .join("\n\n");
 
   const batchPrompt = `Analise TODOS os leads abaixo e dê um score de qualificação para cada um.
@@ -106,10 +122,6 @@ Qualifique CADA lead individualmente. Retorne um array com a qualificação de c
                   type: "number" as const,
                   description: "Score de 0 a 10",
                 },
-                qualified: {
-                  type: "boolean" as const,
-                  description: "O lead é qualificado para abordagem?",
-                },
                 reasoning: {
                   type: "string" as const,
                   description: "Justificativa da decisão",
@@ -120,7 +132,7 @@ Qualifique CADA lead individualmente. Retorne um array com a qualificação de c
                   description: "Oportunidades identificadas",
                 },
               },
-              required: ["score", "qualified", "reasoning", "opportunities"],
+              required: ["score", "reasoning", "opportunities"],
             },
           },
         },
@@ -133,7 +145,6 @@ Qualifique CADA lead individualmente. Retorne um array com a qualificação de c
 
   interface QualResult {
     score: number;
-    qualified: boolean;
     reasoning: string;
     opportunities: string[];
   }
@@ -151,17 +162,25 @@ Qualifique CADA lead individualmente. Retorne um array com a qualificação de c
   const qualifiedLeads: QualifiedLead[] = leads.map((lead, i) => {
     const qual = qualResults[i] ?? {
       score: 0,
-      qualified: false,
       reasoning: "Sem qualificação (erro no batch)",
       opportunities: [],
     };
 
+    // `qualified` é DERIVADO do score, em código, nunca vindo do modelo.
+    // Antes o modelo devolvia o booleano e nada o reconciliava com a regra
+    // "score >= 6" declarada no prompt — dava para voltar score 8 com
+    // qualified false, e o lead sumia em silêncio na tabela.
+    const score = Number.isFinite(qual.score) ? qual.score : 0;
+
     return {
       ...lead,
-      score: qual.score,
-      qualified: qual.qualified,
+      score,
+      qualified: score >= QUALIFICATION_THRESHOLD,
       reasoning: qual.reasoning,
       opportunities: qual.opportunities,
+      // Link sem `?text=` por enquanto — o Copywriter o substitui quando
+      // gerar a mensagem.
+      message: null,
       whatsappLink: buildWhatsAppLink(lead.phone),
     };
   });

@@ -55,38 +55,48 @@ Módulo de orquestração de agentes especialistas usando **LangGraph.js** com p
 ```mermaid
 graph LR
     S[🧠 Supervisor] --> R[🔍 Researcher]
+    S --> E[🌐 Enricher]
     S --> Q[📊 Qualifier]
+    S --> C[✍️ Copywriter]
     S --> H[👤 Human Review]
-    S -.não roteado hoje.-> C[✍️ Copywriter]
     R --> S
+    E --> S
     Q --> S
+    C --> S
     H --> S
-    C -.-> S
 ```
 
-> ⚠️ **Estado real:** o caminho que executa hoje é `researcher → qualifier → human_review`.
-> O nó **Copywriter existe no grafo mas o Supervisor nunca roteia para ele** — a aresta
-> pontilhada é intencional neste diagrama. Ver [`docs/ESTADO.md`](./docs/ESTADO.md) §2.
+O caminho que executa: `researcher → enricher → qualifier → copywriter → human_review`.
+Todo branch do Supervisor é **derivado do estado** — não há flag para resetar.
+Ver [`docs/ESTADO.md`](./docs/ESTADO.md) §1.
 
 #### Agentes Especialistas
 
-| Agente | Papel | Tecnologia | Estado |
-|--------|-------|------------|--------|
-| **Supervisor** | Roteador determinístico — decide o próximo estágio a partir do estado | Regras TypeScript (sem LLM) | ✅ ativo |
-| **Researcher** | Pesquisa leads reais com dados estruturados | Apify Google Maps Scraper (fallback: Tavily → mock) | ✅ ativo |
-| **Qualifier** | Avalia todos os leads de uma vez (score 0-10, oportunidades) | Gemini 3.5 Flash + Structured Output | ✅ ativo |
-| **Copywriter** | Escreveria a mensagem WhatsApp (máx. 5 linhas, tom inferido do segmento) | Gemini 3.5 Flash + prompt battle-tested | ⚠️ **inalcançável** — prompt pronto, nó nunca executa |
-| **Human Review** | Pausa o workflow via `interrupt()` para revisão humana | LangGraph HITL | ✅ ativo |
+| Agente | Papel | Tecnologia |
+|--------|-------|------------|
+| **Supervisor** | Roteador determinístico — decide o próximo estágio a partir do estado | Regras TypeScript (sem LLM) |
+| **Researcher** | Descobre **quem existe** e filtra quem já foi contatado | Apify Google Maps (fallback: Tavily → mock) |
+| **Enricher** | Descobre **como é** — abre o site de cada lead, em paralelo | Firecrawl (`/v2/scrape` → markdown) |
+| **Qualifier** | Pontua todos os leads de uma vez, sobre o conteúdo real do site | Gemini 3.5 Flash + Structured Output |
+| **Copywriter** | Escreve a mensagem de cada lead (máx. 5 linhas, tom inferido do segmento) | Gemini 3.5 Flash + prompt battle-tested |
+| **Human Review** | Pausa o workflow via `interrupt()` para revisão humana | LangGraph HITL |
+
+> **Por que dois scrapers?** Não são concorrentes: o Apify **descobre** (diretório fechado
+> do Maps — o Firecrawl não consegue listar "todas as pizzarias de Itanhaém") e o Firecrawl
+> **enriquece** (web aberta, dado que já temos a URL). Ver
+> [ADR-0011](./docs/adr/0011-apify-descoberta-firecrawl-enriquecimento.md).
 
 #### Funcionalidades do Workflow
 
-* **Apify Google Maps Integration:** Dados reais de empresas (nome, telefone, website, rating, endereço, URL do Maps).
-* **Human-in-the-Loop:** O workflow pausa via `interrupt()` e exibe a tabela de leads antes de qualquer ação externa. Hoje a UI oferece apenas **Concluir** (`approve`) — os caminhos `reject`/`edit` existem no backend sem gatilho na interface.
-* **Link Google Maps:** "📍 Ver no Maps" para cada lead.
-* **Link wa.me:** "📲 WhatsApp" abre a conversa com o número já normalizado (`https://wa.me/{phone}`). ⚠️ **Sem mensagem pré-carregada** — o `?text=` depende do Copywriter, que ainda não é roteado.
-* **Streaming SSE:** Progresso em tempo real (qual agente está rodando, resultados parciais, interrupções).
-* **Checkpointing:** MemorySaver (dev, `globalThis` singleton). O caminho Redis existe em código mas o pacote não está instalado — hoje é sempre MemorySaver.
-* **Qualificação em batch:** uma única chamada estruturada qualifica todos os leads e os ordena por score. Substituiu o desenho anterior de rotação lead-a-lead (ver [ADR-0006](./docs/adr/README.md)).
+* **Descoberta real:** dados de empresas via Google Maps (nome, telefone, website, rating, endereço).
+* **Qualificação sobre fato:** o Qualifier recebe o conteúdo real do site, não só a URL — o critério "site desatualizado" deixou de ser adivinhação.
+* **Mensagem pronta e editável:** o Copywriter gera a abordagem de cada lead; a tabela traz um textarea e o link `wa.me?text=` é **remontado no clique**, então as edições vão junto.
+* **Contexto de demo:** campo opcional por run. Preenchido, o Copywriter menciona a demo com verdade; vazio, é instruído a não prometer nada. Nunca inclui URL — link em WhatsApp frio derruba resposta.
+* **Nunca re-contata:** `lead_key` estável (telefone normalizado ou hash de nome+local); quem já foi abordado é filtrado **na frente** do pipeline, poupando tokens.
+* **"Contatado" vem do clique:** o grafo não consegue observar o envio, então quem afirma o contato é a UI (`POST /api/leads/contacted`), não o workflow.
+* **Human-in-the-Loop:** pausa via `interrupt()`; a UI oferece **Concluir**, **Descartar** e **CSV**.
+* **Streaming SSE:** progresso em tempo real por nó.
+* **Checkpointing:** MemorySaver (dev, `globalThis` singleton); caminho Redis existe em código mas o pacote não está instalado.
 
 ### 5. Engenharia de Chat Robusta & Agnóstica ⚡
 
@@ -172,11 +182,18 @@ Preencha com suas credenciais:
 | `SUPABASE_URL` | — | URL do projeto Supabase (RAG) |
 | `SUPABASE_SERVICE_ROLE_KEY` | — | Service role key do Supabase |
 | `VAULT_PATH` | — | Caminho local do vault Obsidian (padrão: `../segundo-cerebro`) |
-| `APIFY_API_TOKEN` | — | Token API Apify para Google Maps Scraper (Workflows) |
+| `APIFY_API_TOKEN` | — | Token Apify para o Google Maps Scraper — **descoberta** de leads |
+| `FIRECRAWL_API_KEY` | — | Token Firecrawl — **enriquecimento** (abre o site do lead). Sem ela, o Enricher é pulado |
 | `SEARCH_API_KEY` | — | Chave Tavily para busca web real |
 
 ### 3. Configurar o Banco de Dados (Supabase)
-Execute as queries em `supabase/schema.sql` no painel SQL Editor do Supabase.
+No painel SQL Editor do Supabase, execute **os dois** arquivos:
+
+* `supabase/schema.sql` — pgvector e `documents` (RAG sobre o vault)
+* `supabase/prospect.sql` — `prospect_runs` e `leads` (memória da prospecção)
+
+> Sem o `prospect.sql`, o workflow roda normalmente e **nada é gravado** — a persistência
+> é fail-safe por desenho. O sintoma é o pipeline re-oferecendo leads já contatados.
 
 ### 4. Instalar Dependências e Rodar
 ```bash
@@ -201,12 +218,16 @@ npm run sync
 * [x] Glow Pulse sincronizado com voz (Web Audio AnalyserNode)
 * [x] Barge-in inteligente
 * [x] UI imersiva com robô 3D (Spline), glass UI, background WebGL
-* [x] **Workflow Multi-Agente (LangGraph.js)** — grafo hub-and-spoke com supervisor determinístico
+* [x] **Workflow Multi-Agente (LangGraph.js)** — grafo hub-and-spoke, supervisor determinístico com branches derivados do estado
 * [x] **Apify Google Maps Scraper** — leads reais com telefone, website, rating
-* [x] **Qualificação em batch** — uma chamada estruturada qualifica e ranqueia todos os leads
+* [x] **Enriquecimento via Firecrawl** — conteúdo real do site alimenta a qualificação
+* [x] **Qualificação em batch** — uma chamada estruturada pontua e ranqueia todos os leads; corte `score >= 6` aplicado em código
+* [x] **Copywriter em batch** — mensagem por lead, correlacionada por índice
+* [x] **Link wa.me com mensagem** — `?text=` remontado no clique a partir do texto editado
+* [x] **Persistência de leads e runs** — `lead_key` único; nunca re-contata o mesmo negócio
+* [x] **Exportar CSV** — a tabela inteira, com as mensagens editadas
 * [x] **Human-in-the-loop** — `interrupt()`/resume com checkpointing
-* [x] **Link wa.me** — botão que abre a conversa com o número normalizado
-* [x] **Fail-safe em cascata** — Apify → Tavily → mock; Supabase offline → RAG silencioso
+* [x] **Fail-safe em cascata** — Apify → Tavily → mock; sem Firecrawl, qualifica só com Maps; sem Supabase, roda sem memória
 
 > Para o retrato completo e verificado — incluindo o que **não** funciona — ver
 > [`docs/ESTADO.md`](./docs/ESTADO.md). Este checklist lista entregas; aquele documento
@@ -214,13 +235,8 @@ npm run sync
 
 ## 🗺️ Roadmap
 
-**Destrava caixa (próximo)**
-* [ ] **Rotear o Copywriter** — o prompt está pronto e o nó nunca executa. Sem isso o pipeline entrega tabela sem mensagem
-* [ ] **`?text=` no link wa.me** — a mensagem gerada entra no deep-link, editável antes de enviar
-* [ ] **Persistência de Leads no Supabase** — CRM pessoal com histórico; sem isso o mesmo negócio é re-abordado
-* [ ] **Guarda de loop no researcher** — contador de tentativas + `recursionLimit` explícito
-
-**Destrava credibilidade**
+**Destrava credibilidade (próximo)**
+* [ ] **Zerar os erros de lint** — `npm run lint` está vermelho na `main`; consertar antes de montar CI
 * [ ] **Harness de evals** — aderência do copywriter às regras, consistência do qualifier, recall do RAG
 * [ ] **`typecheck` + CI** — lint, typecheck e build no push
 * [ ] **Recuperação escopada por domínio** — parsear frontmatter no sync (ver [ADR-0010](./docs/adr/0010-metadado-do-frontmatter.md))
@@ -231,5 +247,5 @@ npm run sync
 * [ ] **Visão Multimodal** — enviar imagens/screenshots para análise
 * [ ] **Escrita no Vault** (`writeObsidianNote`) — ⚠️ revoga o [ADR-0002](./docs/adr/0002-vault-fonte-de-verdade.md); exige decisão explícita antes
 
-**Descartado**
-* ~~Sender Node (Uazapi/Z-API)~~ — o `wa.me` + clique humano é melhor até o volume exigir: custo zero, risco de ban zero, humano no loop por construção. Ver [ADR-0007](./docs/adr/README.md)
+**Adiado, com gatilho explícito**
+* ⏸ **Sender automático (Uazapi/Z-API)** — o `wa.me` + clique humano é *melhor* enquanto a mensagem não estiver provada: custo zero, risco de ban zero, humano no loop por construção. Automatizar o disparo antes de fechar o primeiro contrato não escala vendas, escala queima de lead — e destrói a propriedade que o copywriter mais persegue ("parece digitada no celular"). **Gatilho:** primeiro contrato fechado *e* envio manual virando gargalo medido. Ver [ADR-0007](./docs/adr/README.md)

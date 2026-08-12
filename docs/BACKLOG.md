@@ -11,24 +11,34 @@
 
 ---
 
-## T1 — destrava caixa (~12–14h, dois dias focados)
+## ✅ T1 — destrava caixa (concluído em 2026-08-11)
 
-O estado final do T1 é concreto: **um run real produz uma tabela de leads qualificados,
-cada um com uma mensagem pronta que ele edita e dispara num clique — e o sistema lembra
-quem já foi contatado.**
+Estado final entregue: **um run produz uma tabela de leads qualificados, cada um com
+mensagem pronta que o Gabriel edita e dispara num clique — e o sistema lembra quem já foi
+contatado.**
 
-| # | Item | Est. | Onde |
-|---|---|---|---|
-| 1 | **Guarda de loop no researcher** — contador de tentativas, branch de saída quando não há leads, `recursionLimit` explícito nos dois `app.stream()` | 45min | `nodes/supervisor.ts`, `types.ts`, `nodes/researcher.ts`, `api/workflow/route.ts` |
-| 2 | **Derivar `qualified` do score em código** e tirar o campo do `responseSchema` | 15min | `nodes/qualifier.ts` |
-| 3 | **Token Apify no header** em vez da query string | 5min | `nodes/researcher.ts` |
-| 4 | **`SEARCH_API_KEY` real, ou anunciar o mock** — hoje a busca web mente em silêncio | 30min | `.env.local`, `lib/ai/tools.ts` |
-| 5 | **Chave estável de lead** (`leadKey`) + builder de link WhatsApp com `?text=` | 45min | novo: `lib/workflows/lead-key.ts`, `lib/workflows/whatsapp.ts` |
-| 6 | **Copywriter em batch** — reescrever no mesmo formato do qualifier, mesclando `message` em `qualifiedLeads` | 3h | `nodes/copywriter.ts`, `types.ts` |
-| 7 | **Rotear o copywriter** — branch derivado do estado (`algum lead qualificado sem mensagem?`) | 20min | `nodes/supervisor.ts` |
-| 8 | **Persistência de leads e runs** — DDL, repositório, gravação a partir da rota, pular já-contatados no researcher, `POST /api/leads/contacted` | 4h | novo: `supabase/prospect.sql`, `lib/prospect/repository.ts` |
-| 9 | **UI: mensagem editável** — textarea por lead, link reconstruído no clique, botão Copiar, botão Descartar, marcar contatado | 2h | `WorkflowPanel.tsx` |
-| 10 | **Exportar CSV** — `Blob` no cliente, zero dependência | 45min | `WorkflowPanel.tsx` |
+| # | Item | Onde |
+|---|---|---|
+| ✅ 1 | Guarda de loop: `researchAttempts` + branch de saída + `recursionLimit: 12` | `nodes/supervisor.ts`, `types.ts`, `nodes/researcher.ts`, `api/workflow/route.ts` |
+| ✅ 2 | `qualified` derivado de `score >= 6` em código; campo fora do `responseSchema` | `nodes/qualifier.ts` |
+| ✅ 3 | Token Apify no header `Authorization` | `nodes/researcher.ts` |
+| ✅ 5 | `leadKey` estável + `buildWhatsAppLink` com `?text=` | `lib/workflows/lead-key.ts`, `lib/workflows/whatsapp.ts` |
+| ✅ 6 | Copywriter em batch, correlacionado por `index`, mesclando `message` | `nodes/copywriter.ts` |
+| ✅ 7 | Copywriter roteado pelo branch 6 (derivado do estado) | `nodes/supervisor.ts` |
+| ✅ 7b | Nó `enricher` (Firecrawl) + rubrica do qualifier reescrita sobre fato | `nodes/enricher.ts`, `lib/workflows/firecrawl.ts`, `prompts.ts` |
+| ✅ 8 | Persistência de runs e leads, dedupe na frente, `POST /api/leads/contacted` | `supabase/prospect.sql`, `lib/prospect/repository.ts` |
+| ✅ 9 | UI: textarea por lead, link remontado no clique, Copiar, Descartar, marcar contatado | `WorkflowPanel.tsx` |
+| ✅ 10 | Exportar CSV (`Blob`, zero dependência, BOM para o Excel) | `WorkflowPanel.tsx` |
+| ➕ | Grafo compilado memoizado no `globalThis` (era item T2) | `lib/workflows/graph.ts` |
+| ⏭ 4 | **`SEARCH_API_KEY` real, ou anunciar o mock** — não feito; segue em T2 | `.env.local`, `lib/ai/tools.ts` |
+
+**Pendências deixadas de propósito:**
+- O item 4 continua aberto: a busca web ainda cai num mock silencioso. Agora com o Apify
+  no caminho feliz, ela só importa no fallback — mas é exatamente a classe de falha do
+  [ADR-0004](./adr/0004-fallbacks-em-cascata.md) e sobe para T2 junto com o item de
+  visibilidade de fallback.
+- `supabase/prospect.sql` precisa ser **rodado à mão** no dashboard antes do primeiro run
+  com persistência. Sem isso, tudo funciona e nada é gravado (fail-safe por desenho).
 
 ### Três detalhes de implementação que custam caro se descobertos tarde
 
@@ -71,22 +81,25 @@ resto do desenho herda.
 | 5 | **Threshold + teto de chunks por arquivo** em `retrieveContext` | 1h |
 | 6 | **`match_documents_scoped`** + `searchSecondBrain(query, dominio?, tipo?)` | 3h |
 | 7 | **Eval de recall** (15 casos) — **escrever antes** dos itens 5 e 6, para ter número de antes | 2h |
-| 8 | **Visibilidade de fallback** — todo caminho degradado aparece no log e na UI ([ADR-0004](./adr/0004-fallbacks-em-cascata.md)) | 1h |
-| 9 | **Memoizar o grafo compilado** no `globalThis`, mesmo padrão do checkpointer | 15min |
-| 10 | **ADRs restantes** (0005, 0006, 0007 por extenso) + limpeza de código morto | 2h |
+| 8 | **Visibilidade de fallback** — todo caminho degradado aparece no log e na UI ([ADR-0004](./adr/0004-fallbacks-em-cascata.md)). Inclui o item 4 do T1 que ficou aberto: `SEARCH_API_KEY` real ou mock anunciado | 1h30 |
+| ~~9~~ | ~~Memoizar o grafo compilado~~ — **feito no T1** | — |
+| 10 | **ADRs restantes** (0005, 0006, 0007 por extenso) + ADR sobre persistência fora do nó + limpeza de código morto | 2h30 |
 
 **O item 1 é o sinal mais barulhento que falta.** Um repositório sem script de `typecheck`
 e sem CI é lido como "não sênior" antes de qualquer pessoa abrir um arquivo — que é
 exatamente o feedback que o Gabriel recebeu no desligamento. Duas horas.
 
 **O item 2 tem um argumento melhor que cobertura.** `supervisorNode` é função pura de
-estado: testar é montar objeto e conferir `nextAgent`, sem mock nem rede. Três asserções
-teriam pego as duas lacunas mais caras do [`ESTADO.md`](./ESTADO.md):
+estado: testar é montar objeto e conferir `nextAgent`, sem mock nem rede. Estas asserções
+cobrem os dois bugs mais caros que o T1 consertou — e são a rede que impede o retorno
+deles:
 
 ```
-leads: [], tentativas: 0                        → "researcher"
-leads: [], tentativas: 1                        → "__end__"       (o loop caro)
-lead qualificado sem mensagem                   → "copywriter"    (o nó morto)
+leads: [], tentativas: 0                          → "researcher"
+leads: [], tentativas: 1                          → "__end__"     (o loop caro)
+lead com site, siteAnalysis undefined             → "enricher"
+lead qualificado sem message                      → "copywriter"  (o nó morto)
+zero qualificados                                 → "human_review" (não chama copywriter)
 ```
 
 **A ordem do 7 antes do 5 e 6 é o ponto.** Não discutir se scoping/threshold/chunking
@@ -115,8 +128,13 @@ ajudam. Medir. Escrever os 15 casos primeiro é o que transforma opinião em nú
 - **Reranking ou busca híbrida.** São ~300 chunks e não há medição — não dá para saber se
   ajudou. Threshold, teto por arquivo e chunking são mais baratos e vêm antes.
 - **Índice GIN.** O Postgres ignoraria.
-- **API de WhatsApp (Uazapi/Z-API).** O `wa.me` + clique humano é *melhor* até o volume
-  forçar: custo zero, risco de ban zero, humano no loop por construção. Sai do roadmap.
+- **API de WhatsApp (Uazapi/Z-API) — ainda não, e o critério importa.** O `wa.me` + clique
+  humano é *melhor* enquanto a mensagem não estiver provada: custo zero, risco de ban zero,
+  humano no loop por construção. Automatizar o envio antes de ter **um negócio fechado**
+  não escala vendas — escala queima de lead, e destrói a propriedade que o
+  `COPYWRITER_PROMPT` mais persegue ("parece digitada no celular, não gerada por IA").
+  **Gatilho para reavaliar:** primeiro contrato fechado *e* o envio manual virando gargalo
+  medido. Automatize a pesquisa e a redação agora; o disparo, depois da prova.
 - **Refatorar `app/page.tsx`** (553 linhas). Funciona, é superfície de demo, e não rende nada.
 - **Segundo workflow antes de a prospecção pagar.**
 - **LangGraph em qualquer lugar do caminho de chat.** `streamOdinResponse` streama; o grafo

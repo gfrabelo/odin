@@ -9,7 +9,8 @@
  *   │  SUPERVISOR   │ ← Ponto de entrada. Decide quem roda a seguir.
  *   └──────┬───────┘
  *          │ conditional edge (baseado em `nextAgent`)
- *          ├──→ researcher  ──→ supervisor
+ *          ├──→ researcher  ──→ supervisor   (Apify: QUEM existe)
+ *          ├──→ enricher    ──→ supervisor   (Firecrawl: COMO é o site)
  *          ├──→ qualifier   ──→ supervisor
  *          ├──→ copywriter  ──→ supervisor
  *          ├──→ human_review ──→ supervisor
@@ -47,6 +48,7 @@ import { WorkflowState } from "./types";
 import type { AgentName } from "./types";
 import { supervisorNode } from "./nodes/supervisor";
 import { researcherNode } from "./nodes/researcher";
+import { enricherNode } from "./nodes/enricher";
 import { qualifierNode } from "./nodes/qualifier";
 import { copywriterNode } from "./nodes/copywriter";
 import { humanReviewNode } from "./nodes/human-review";
@@ -68,6 +70,7 @@ function routeFromSupervisor(
   // Guard: se o Supervisor retornar algo inválido, encerra
   const validAgents: Array<AgentName | "__end__"> = [
     "researcher",
+    "enricher",
     "qualifier",
     "copywriter",
     "human_review",
@@ -94,7 +97,7 @@ function routeFromSupervisor(
  *
  * @returns O grafo compilado, pronto para `.invoke()` ou `.stream()`.
  */
-export async function createProspectWorkflow() {
+async function buildProspectWorkflow() {
   const checkpointer = await getCheckpointer();
 
   // ─── Construção do grafo ──────────────────────────────────────
@@ -104,6 +107,7 @@ export async function createProspectWorkflow() {
     // 1. Registrar os nodes (cada agente é uma função pura)
     .addNode("supervisor", supervisorNode)
     .addNode("researcher", researcherNode)
+    .addNode("enricher", enricherNode)
     .addNode("qualifier", qualifierNode)
     .addNode("copywriter", copywriterNode)
     .addNode("human_review", humanReviewNode)
@@ -114,6 +118,7 @@ export async function createProspectWorkflow() {
     // 3. Conditional edge: o Supervisor decide para onde ir
     .addConditionalEdges("supervisor", routeFromSupervisor, {
       researcher: "researcher",
+      enricher: "enricher",
       qualifier: "qualifier",
       copywriter: "copywriter",
       human_review: "human_review",
@@ -122,6 +127,7 @@ export async function createProspectWorkflow() {
 
     // 4. Todos os especialistas voltam para o Supervisor (hub and spoke)
     .addEdge("researcher", "supervisor")
+    .addEdge("enricher", "supervisor")
     .addEdge("qualifier", "supervisor")
     .addEdge("copywriter", "supervisor")
     .addEdge("human_review", "supervisor");
@@ -135,9 +141,24 @@ export async function createProspectWorkflow() {
   // node rodar (sem mudar o código do node), usaríamos:
   //   interruptBefore: ["human_review"]
 
-  const app = workflow.compile({
-    checkpointer,
-  });
+  return workflow.compile({ checkpointer });
+}
 
-  return app;
+/**
+ * Grafo compilado, memoizado no `globalThis`.
+ *
+ * Antes o grafo era recompilado a cada request (POST, PUT e GET) — só o
+ * checkpointer era singleton. O `globalThis` é o mesmo padrão de
+ * `checkpointer.ts`: sobrevive ao hot-reload do `next dev`, que de outra
+ * forma recriaria tudo a cada arquivo salvo. Ver ADR-0005.
+ */
+const globalForWorkflow = globalThis as unknown as {
+  __odinWorkflow?: Promise<Awaited<ReturnType<typeof buildProspectWorkflow>>>;
+};
+
+export function createProspectWorkflow() {
+  // Guarda a Promise, não o valor resolvido: dois requests simultâneos no
+  // primeiro acesso compartilham a mesma compilação em vez de disparar duas.
+  globalForWorkflow.__odinWorkflow ??= buildProspectWorkflow();
+  return globalForWorkflow.__odinWorkflow;
 }

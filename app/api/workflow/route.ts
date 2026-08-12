@@ -28,9 +28,56 @@
 
 import { createProspectWorkflow } from "@/lib/workflows/graph";
 import { Command } from "@langchain/langgraph";
-import type { WorkflowEvent, WorkflowEventType, AgentName } from "@/lib/workflows/types";
+import { saveRun } from "@/lib/prospect/repository";
+import type {
+  WorkflowEvent,
+  WorkflowEventType,
+  AgentName,
+  QualifiedLead,
+} from "@/lib/workflows/types";
 
 export const runtime = "nodejs";
+
+/**
+ * Teto de passos do grafo.
+ *
+ * Rede de segurança, não a correção: quem impede o loop caro é o
+ * `researchAttempts` no supervisor. Sem o contador, este limite ainda
+ * pagaria ~6 chamadas Apify de 120s antes de estourar. O default do
+ * LangGraph é 25 — alto demais quando cada volta custa dinheiro.
+ */
+const RECURSION_LIMIT = 12;
+
+/**
+ * Persiste o run e seus leads.
+ *
+ * Fica AQUI, e não num nó, porque o LangGraph reexecuta o nó do topo ao
+ * retomar de um `interrupt()` — uma escrita dentro de `human-review.ts`
+ * rodaria duas vezes. A rota é a fronteira transacional. Ver ADR-0013 (a
+ * escrever) e o cabeçalho de `lib/prospect/repository.ts`.
+ *
+ * Nunca lança: falha de persistência não pode derrubar o stream do usuário.
+ */
+async function persistState(
+  threadId: string,
+  values: Record<string, unknown>,
+  status: string
+): Promise<void> {
+  const qualifiedLeads = (values.qualifiedLeads as QualifiedLead[]) ?? [];
+  const leads = (values.leads as unknown[]) ?? [];
+
+  await saveRun(
+    {
+      threadId,
+      task: (values.task as string) ?? "",
+      demoContext: (values.demoContext as string) ?? "",
+      status,
+      totalFound: leads.length,
+      totalQualified: qualifiedLeads.filter((l) => l.qualified).length,
+    },
+    qualifiedLeads
+  );
+}
 
 // ─── Helpers SSE ────────────────────────────────────────────────────
 
@@ -53,6 +100,8 @@ function createSSEEvent(
 interface WorkflowRequest {
   task: string;
   threadId?: string;
+  /** Contexto da demo pronta para este nicho (opcional). Ver ADR-0011. */
+  demoContext?: string;
 }
 
 export async function POST(req: Request) {
@@ -63,7 +112,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "JSON inválido." }, { status: 400 });
   }
 
-  const { task, threadId } = body;
+  const { task, threadId, demoContext } = body;
 
   if (!task?.trim()) {
     return Response.json({ error: "`task` é obrigatório." }, { status: 400 });
@@ -93,11 +142,13 @@ export async function POST(req: Request) {
         const eventStream = await app.stream(
           {
             task,
+            demoContext: demoContext?.trim() ?? "",
             status: "running" as const,
           },
           {
             configurable: { thread_id },
             streamMode: "updates",
+            recursionLimit: RECURSION_LIMIT,
           }
         );
 
@@ -139,6 +190,11 @@ export async function POST(req: Request) {
           const interruptData =
             interruptTask?.interrupts?.[0]?.value ?? {};
 
+          // Persiste ANTES de emitir o interrupt: é aqui que os leads
+          // existem pela primeira vez em forma final, e é o ponto em que o
+          // usuário pode fechar a aba a qualquer momento.
+          await persistState(thread_id, finalState.values, "waiting_human");
+
           controller.enqueue(
             encoder.encode(
               createSSEEvent("interrupt", "human_review", {
@@ -148,12 +204,15 @@ export async function POST(req: Request) {
             )
           );
         } else {
-          // Workflow completou normalmente
+          // Workflow completou (ou falhou) sem pausar.
+          const status = (finalState.values?.status as string) ?? "completed";
+          await persistState(thread_id, finalState.values, status);
+
           controller.enqueue(
             encoder.encode(
               createSSEEvent("workflow_end", null, {
                 thread_id,
-                status: "completed",
+                status,
                 state: finalState.values,
               })
             )
@@ -185,11 +244,15 @@ export async function POST(req: Request) {
 
 // ─── PUT: Retomar Workflow (Human Decision) ─────────────────────────
 
+/**
+ * Não existe mais `edit`. A edição da mensagem acontece direto no textarea
+ * da tabela e o link `wa.me` é remontado no clique — uma volta pelo grafo
+ * para revisar uma mensagem é estritamente pior em latência e em código.
+ * O caminho era obsoleto por arquitetura, não inacabado.
+ */
 interface ResumeRequest {
   threadId: string;
-  decision: "approve" | "reject" | "edit";
-  feedback?: string;
-  editedMessage?: string;
+  decision: "approve" | "reject";
 }
 
 export async function PUT(req: Request) {
@@ -200,14 +263,17 @@ export async function PUT(req: Request) {
     return Response.json({ error: "JSON inválido." }, { status: 400 });
   }
 
-  const { threadId, decision, feedback, editedMessage } = body;
+  const { threadId, decision } = body;
 
   if (!threadId) {
     return Response.json({ error: "`threadId` é obrigatório." }, { status: 400 });
   }
 
-  if (!decision) {
-    return Response.json({ error: "`decision` é obrigatório." }, { status: 400 });
+  if (decision !== "approve" && decision !== "reject") {
+    return Response.json(
+      { error: "`decision` deve ser 'approve' ou 'reject'." },
+      { status: 400 }
+    );
   }
 
   const encoder = new TextEncoder();
@@ -230,12 +296,11 @@ export async function PUT(req: Request) {
         // O Command.resume() envia o valor de volta para a função
         // interrupt() que estava esperando.
         const resumeStream = await app.stream(
-          new Command({
-            resume: { decision, feedback, editedMessage },
-          }),
+          new Command({ resume: { decision } }),
           {
             configurable: { thread_id: threadId },
             streamMode: "updates",
+            recursionLimit: RECURSION_LIMIT,
           }
         );
 
@@ -269,6 +334,7 @@ export async function PUT(req: Request) {
             (t: { interrupts?: unknown[] }) =>
               t.interrupts && t.interrupts.length > 0
           );
+          await persistState(threadId, finalState.values, "waiting_human");
           controller.enqueue(
             encoder.encode(
               createSSEEvent("interrupt", "human_review", {
@@ -278,11 +344,13 @@ export async function PUT(req: Request) {
             )
           );
         } else {
+          const status = (finalState.values?.status as string) ?? "completed";
+          await persistState(threadId, finalState.values, status);
           controller.enqueue(
             encoder.encode(
               createSSEEvent("workflow_end", null, {
                 thread_id: threadId,
-                status: "completed",
+                status,
                 state: finalState.values,
               })
             )

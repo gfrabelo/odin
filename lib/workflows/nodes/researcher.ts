@@ -12,6 +12,9 @@
 import { getGemini } from "@/lib/ai/client";
 import { executeTool } from "@/lib/ai/tools";
 import { RESEARCHER_PROMPT } from "../prompts";
+import { leadKey } from "../lead-key";
+import { normalizePhoneBR } from "../whatsapp";
+import { findContactedKeys } from "@/lib/prospect/repository";
 import type { OdinWorkflowState, LeadInfo, WorkflowMessage } from "../types";
 
 const RESEARCHER_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";
@@ -30,20 +33,6 @@ interface ApifyPlaceResult {
   totalScore?: number;
   url?: string;
   [key: string]: unknown;
-}
-
-/**
- * Normaliza telefone BR para formato internacional (5511999999999).
- * Remove caracteres não-numéricos e adiciona o código do país se ausente.
- */
-function normalizePhoneBR(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length < 10) return null; // muito curto para ser válido
-  // Se já começa com 55 e tem 12-13 dígitos, retorna como está
-  if (digits.startsWith("55") && digits.length >= 12) return digits;
-  // Adiciona código do país BR
-  return `55${digits}`;
 }
 
 /**
@@ -66,7 +55,9 @@ async function searchGoogleMaps(
   }
 
   const actorId = "compass~crawler-google-places";
-  const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${token}`;
+  // Token no header, não na query string: query string vaza em log de proxy,
+  // histórico e trace de erro.
+  const url = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items`;
 
   const input = {
     searchStringsArray: [query],
@@ -83,7 +74,10 @@ async function searchGoogleMaps(
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify(input),
       signal: AbortSignal.timeout(120_000), // 2 min timeout
     });
@@ -98,18 +92,24 @@ async function searchGoogleMaps(
     const results: ApifyPlaceResult[] = await response.json();
     console.log(`[Odin Workflow] Researcher: Apify retornou ${results.length} resultados`);
 
-    const leads = results.map((place) => ({
-      name: place.title ?? "Sem nome",
-      segment: place.categoryName ?? "Não categorizado",
-      phone: normalizePhoneBR(place.phone),
-      website: place.website || null,
-      location: [place.address, place.city, place.state]
-        .filter(Boolean)
-        .join(", ") || null,
-      rating: place.totalScore ?? null,
-      source: "google_maps_apify",
-      googleMapsUrl: place.url ?? null,
-    }));
+    const leads = results.map((place) => {
+      const name = place.title ?? "Sem nome";
+      const phone = normalizePhoneBR(place.phone);
+      const location =
+        [place.address, place.city, place.state].filter(Boolean).join(", ") || null;
+
+      return {
+        leadKey: leadKey({ name, phone, location }),
+        name,
+        segment: place.categoryName ?? "Não categorizado",
+        phone,
+        website: place.website || null,
+        location,
+        rating: place.totalScore ?? null,
+        source: "google_maps_apify",
+        googleMapsUrl: place.url ?? null,
+      };
+    });
 
     return { leads };
   } catch (err) {
@@ -175,7 +175,15 @@ Extraia os leads encontrados no formato JSON.`;
   const text = response.text ?? '{"leads":[]}';
   try {
     const parsed = JSON.parse(text) as { leads: LeadInfo[] };
-    return parsed.leads.map((l) => ({ ...l, googleMapsUrl: null }));
+    return parsed.leads.map((l) => {
+      const phone = normalizePhoneBR(l.phone);
+      return {
+        ...l,
+        phone,
+        googleMapsUrl: null,
+        leadKey: leadKey({ name: l.name, phone, location: l.location }),
+      };
+    });
   } catch {
     return [];
   }
@@ -200,21 +208,45 @@ export async function researcherNode(
   // 3. Filtra leads sem nome útil
   leads = leads.filter((l) => l.name && l.name !== "Sem nome");
 
-  const isApify = leads.length > 0 && leads[0].source === "google_maps_apify";
+  // 4. Descarta quem já foi contatado num run anterior.
+  //
+  //    Isto vai AQUI, na frente, e não no fim: filtrar antes do Qualifier
+  //    e do Copywriter economiza as duas chamadas de LLM. Gravar só no fim
+  //    não evitaria gasto nenhum. Fail-safe: sem Supabase, `findContactedKeys`
+  //    devolve Set vazio e nada é descartado.
+  const foundCount = leads.length;
+  const contacted = await findContactedKeys(leads.map((l) => l.leadKey));
+  if (contacted.size > 0) {
+    leads = leads.filter((l) => !contacted.has(l.leadKey));
+  }
+
+  const isApify = apifyResult.leads.length > 0;
   const sourceText = isApify
     ? "Google Maps (Apify)"
     : `Web Search (fallback${apifyResult.error ? `: ${apifyResult.error}` : ""})`;
 
+  const skippedText =
+    contacted.size > 0 ? ` ${contacted.size} já contatados, pulados.` : "";
+
   const logMessage: WorkflowMessage = {
     agent: "researcher",
-    content: `Encontrados ${leads.length} leads via ${sourceText}. ${leads.map((l) => `${l.name} (${l.segment})`).join(", ")}.`,
+    content:
+      `Encontrados ${foundCount} leads via ${sourceText}.${skippedText}` +
+      (leads.length > 0
+        ? ` Novos: ${leads.map((l) => `${l.name} (${l.segment})`).join(", ")}.`
+        : " Nenhum lead novo."),
     timestamp: new Date().toISOString(),
   };
 
-  console.log(`[Odin Workflow] Researcher encontrou ${leads.length} leads via ${sourceText}`);
+  console.log(
+    `[Odin Workflow] Researcher: ${foundCount} encontrados, ${contacted.size} já contatados, ${leads.length} novos (${sourceText})`
+  );
 
   return {
     leads,
+    // Incrementa SEMPRE, inclusive quando não veio nada — é o que permite ao
+    // supervisor encerrar em vez de re-acionar o researcher em loop.
+    researchAttempts: state.researchAttempts + 1,
     currentAgent: "researcher",
     messages: [logMessage],
   };

@@ -31,6 +31,7 @@ import { Annotation } from "@langchain/langgraph";
 export type AgentName =
   | "supervisor"
   | "researcher"
+  | "enricher"
   | "qualifier"
   | "copywriter"
   | "human_review";
@@ -43,8 +44,35 @@ export type WorkflowStatus =
   | "completed"
   | "failed";
 
+/**
+ * Análise do site do lead, feita pelo Enricher (Firecrawl).
+ *
+ * Existe porque a rubrica do Qualifier dá pontos por "site desatualizado/ruim"
+ * e, sem isso, o modelo recebia só a string da URL — ou seja, adivinhava.
+ * Ver ADR-0011.
+ */
+export interface SiteAnalysis {
+  /** O scrape deu certo? Se false, `error` explica e o Qualifier ignora. */
+  ok: boolean;
+  /** Título da página (metadata). */
+  title: string | null;
+  /**
+   * Markdown da home, TRUNCADO (~2000 chars). O estado inteiro é
+   * checkpointado a cada transição — markdown bruto de 10 sites incharia
+   * o checkpoint sem melhorar o julgamento.
+   */
+  markdown: string | null;
+  /** Motivo da falha, quando `ok` é false. */
+  error: string | null;
+}
+
 /** Informações de um lead encontrado pelo Researcher. */
 export interface LeadInfo {
+  /**
+   * Chave estável do lead — telefone normalizado, ou hash de nome+localização.
+   * É o mecanismo de nunca re-contatar o mesmo negócio entre runs.
+   */
+  leadKey: string;
   /** Nome do negócio/empresa. */
   name: string;
   /** Segmento/nicho do negócio. */
@@ -61,31 +89,28 @@ export interface LeadInfo {
   source: string;
   /** URL direta do Google Maps (deep-link). */
   googleMapsUrl: string | null;
-}
-
-/** Resultado da qualificação do lead pelo Qualifier. */
-export interface QualificationResult {
-  /** Score de 0 a 10 (quanto maior, melhor o fit). */
-  score: number;
-  /** O lead é qualificado para abordagem? */
-  qualified: boolean;
-  /** Razão da decisão (para log e transparência). */
-  reasoning: string;
-  /** Oportunidades identificadas (sem site, site ruim, sem IA, etc). */
-  opportunities: string[];
+  /**
+   * Análise do site. Três estados distintos, de propósito:
+   *  - `undefined` → ainda não passou pelo Enricher (é o que o supervisor testa)
+   *  - `null`      → não tem site para analisar
+   *  - objeto      → foi analisado (veja `ok` para saber se deu certo)
+   */
+  siteAnalysis?: SiteAnalysis | null;
 }
 
 /** Lead + qualificação unificados — um item da tabela de resultados. */
 export interface QualifiedLead extends LeadInfo {
   /** Score de qualificação (0-10). */
   score: number;
-  /** O lead é qualificado para abordagem? */
+  /** Derivado em código de `score >= 6`, nunca vindo do modelo. */
   qualified: boolean;
   /** Justificativa do score. */
   reasoning: string;
   /** Oportunidades identificadas. */
   opportunities: string[];
-  /** Link wa.me pronto com telefone (null se sem phone). */
+  /** Mensagem de abordagem gerada pelo Copywriter (null = ainda não gerada). */
+  message: string | null;
+  /** Link wa.me — com `?text=` quando já há mensagem. */
   whatsappLink: string | null;
 }
 
@@ -132,10 +157,40 @@ export const WorkflowState = Annotation.Root({
     default: () => "supervisor" as AgentName,
   }),
 
-  /** Leads encontrados pelo Researcher (append — pode achar mais de um). */
+  /**
+   * Contexto da demo disponível para este nicho, informado pelo humano.
+   * Ex: "site pronto pra chocolateria, feito pra chocoLaura em Peruíbe".
+   *
+   * Existe porque a regra 6 do COPYWRITER_PROMPT manda mencionar a demo — e
+   * sem este campo a menção era mentira. Ver ADR-0011.
+   */
+  demoContext: Annotation<string>({
+    reducer: (_, y) => y,
+    default: () => "",
+  }),
+
+  /**
+   * Leads encontrados pelo Researcher.
+   *
+   * REPLACE, não append. O append era o que fazia uma nova passada do
+   * researcher duplicar leads; "o researcher é dono da lista" é o contrato
+   * honesto. Se um dia houver fan-out de várias queries, isto muda.
+   */
   leads: Annotation<LeadInfo[]>({
-    reducer: (current, next) => [...current, ...next],
+    reducer: (_, y) => y,
     default: () => [],
+  }),
+
+  /**
+   * Quantas vezes o Researcher já rodou.
+   *
+   * É a correção do loop caro: sem este contador, `leads.length === 0`
+   * mandava o supervisor de volta ao researcher indefinidamente, pagando
+   * uma chamada Apify de 120s por volta.
+   */
+  researchAttempts: Annotation<number>({
+    reducer: (_, y) => y,
+    default: () => 0,
   }),
 
   /** Leads qualificados em batch (replace — qualifier substitui tudo de uma vez). */
@@ -144,58 +199,23 @@ export const WorkflowState = Annotation.Root({
     default: () => [],
   }),
 
-  /** Índice do lead atualmente sendo processado (legacy, usado no incremento 2). */
-  currentLeadIndex: Annotation<number>({
-    reducer: (_, y) => y,
-    default: () => 0,
-  }),
-
-  /** Resultado da qualificação do lead atual (legacy, usado no incremento 2). */
-  qualification: Annotation<QualificationResult | null>({
-    reducer: (_, y) => y,
-    default: () => null,
-  }),
-
-  /** Rascunho da mensagem de abordagem gerado pelo Copywriter. */
-  outreachDraft: Annotation<string>({
-    reducer: (_, y) => y,
-    default: () => "",
-  }),
-
-  /** Feedback do Critic ou do humano sobre o draft. */
-  feedback: Annotation<string>({
-    reducer: (_, y) => y,
-    default: () => "",
-  }),
-
-  /** O draft foi aprovado (pelo critic/humano)? */
-  approved: Annotation<boolean>({
-    reducer: (_, y) => y,
-    default: () => false,
-  }),
-
-  /** Quantas revisões o draft já passou (evita loop infinito). */
-  revisionCount: Annotation<number>({
-    reducer: (_, y) => y,
-    default: () => 0,
-  }),
-
   /** Log de mensagens internas do workflow (append — histórico completo). */
   messages: Annotation<WorkflowMessage[]>({
     reducer: (current, next) => [...current, ...next],
     default: () => [],
   }),
 
-  /** Resultado final do humano: "approve" | "reject" | "edit". */
-  humanDecision: Annotation<"approve" | "reject" | "edit" | null>({
+  /**
+   * Decisão final do humano sobre a tabela.
+   *
+   * Não existe mais "edit": a edição da mensagem acontece direto no textarea
+   * da tabela e o link wa.me é remontado no clique. Uma volta pelo grafo para
+   * revisar uma mensagem é estritamente pior — o caminho é obsoleto por
+   * arquitetura, não inacabado.
+   */
+  humanDecision: Annotation<"approve" | "reject" | null>({
     reducer: (_, y) => y,
     default: () => null,
-  }),
-
-  /** Mensagem editada pelo humano (se humanDecision === "edit"). */
-  humanEditedMessage: Annotation<string>({
-    reducer: (_, y) => y,
-    default: () => "",
   }),
 });
 

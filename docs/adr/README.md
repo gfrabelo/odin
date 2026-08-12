@@ -35,6 +35,7 @@ Se você tem cinco minutos e quer entender como este projeto pensa, leia estes t
 | [0008](./0008-um-cerebro-nao-cinco.md) | Um cérebro, não cinco: domínio não é agente | Aceita | 2026-08-11 |
 | [0009](./0009-regra-do-turno.md) | A Regra do Turno: quando escalar para LangGraph | Aceita | 2026-08-11 |
 | [0010](./0010-metadado-do-frontmatter.md) | Metadado de recuperação vem do frontmatter, não do caminho | Aceita | 2026-08-11 |
+| [0011](./0011-apify-descoberta-firecrawl-enriquecimento.md) | Apify descobre, Firecrawl enriquece | Aceita | 2026-08-11 |
 
 **0005, 0006 e 0007 estão registrados mas não escritos por extenso.** A decisão e o
 tradeoff estão resumidos abaixo; o documento completo entra quando alguém precisar
