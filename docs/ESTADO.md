@@ -69,7 +69,7 @@ Ordenado por impacto, não por dificuldade.
 | 6 | Só `MemorySaver` | `lib/workflows/checkpointer.ts` | Restart mata workflow parado esperando revisão. O caminho Redis existe mas o pacote não está no `package.json` |
 | 7 | Chunking cego a markdown | `scripts/sync.ts:44-55` | Corta a 1200 chars no meio de seção e tabela |
 | 8 | Comentário do schema mente sobre o modelo | `supabase/schema.sql:13` | Diz `text-embedding-004`; o código usa `gemini-embedding-001` truncado a 768 (`lib/rag/embeddings.ts`) |
-| 9 | Código morto | `components/ui/web-gl-shader.tsx`, `button.tsx`, `card.tsx`, `copywriter-system.md` (raiz) | Sedimento de refactors que nunca removeram o antigo. O `@anthropic-ai/sdk` saiu do `package.json` na limpeza de 2026-09-01 (nenhum import em `lib/`, `app/` ou `scripts/`) |
+| 9 | Código morto | `components/ui/web-gl-shader.tsx`, `button.tsx`, `card.tsx` | Sedimento de refactors que nunca removeram o antigo. Na limpeza de 2026-09-01 saíram o `@anthropic-ai/sdk` (zero imports) e o `copywriter-system.md` da raiz — duplicata desatualizada do prompt vivo em `lib/workflows/prompts.ts:84` |
 | 10 | Sem guarda de idempotência na persistência | `app/api/workflow/route.ts` (`persistState`) | A gravação vive na rota justamente para evitar a reexecução do nó no resume. Se um dia o grafo rodar fora do HTTP (cron), isso migra para um nó e **precisa** de guarda — o upsert por `lead_key` cobre, mas o run não |
 
 **Resolvido no T1** (2026-08-11), mantido aqui como histórico do que foi consertado:

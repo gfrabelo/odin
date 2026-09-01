@@ -91,6 +91,6 @@ por ninguém — eram *descrição de comportamento disfarçada de prompt*.
 
 ## Referências
 
-- Post-mortem original, com o código do bug: [`LANGGRAPH_MULTI_AGENT_GUIDE.md`](../../LANGGRAPH_MULTI_AGENT_GUIDE.md) §4
+- Post-mortem original, com o código do bug: [`GUIA-LANGGRAPH.md`](../GUIA-LANGGRAPH.md) §4
 - Decisão irmã, sobre limites de escalada: [ADR-0009 — A Regra do Turno](./0009-regra-do-turno.md)
 - O desenho de rotação que este ADR aposentou: ADR-0006 (resumido no [índice](./README.md))

@@ -26,12 +26,12 @@ type: wiki
 >
 > | O que estava aqui | Agora vive em |
 > |---|---|
-> | §4 — Bug do loop infinito de estado | [ADR-0003 — Supervisor determinístico](./docs/adr/0003-supervisor-deterministico.md) |
-> | §5 — `globalThis` e hot-reload | ADR-0005 ([índice](./docs/adr/README.md)) |
-> | §6 — Fallbacks em cascata | [ADR-0004 — Fallbacks em cascata](./docs/adr/0004-fallbacks-em-cascata.md) |
-> | §6 — `wa.me` como sender | ADR-0007 ([índice](./docs/adr/README.md)) |
-> | §1 — quando **não** usar grafo | [ADR-0009 — A Regra do Turno](./docs/adr/0009-regra-do-turno.md) |
-> | §6 — dois scrapers, papéis distintos | [ADR-0011 — Apify descobre, Firecrawl enriquece](./docs/adr/0011-apify-descoberta-firecrawl-enriquecimento.md) |
+> | §4 — Bug do loop infinito de estado | [ADR-0003 — Supervisor determinístico](./adr/0003-supervisor-deterministico.md) |
+> | §5 — `globalThis` e hot-reload | ADR-0005 ([índice](./adr/README.md)) |
+> | §6 — Fallbacks em cascata | [ADR-0004 — Fallbacks em cascata](./adr/0004-fallbacks-em-cascata.md) |
+> | §6 — `wa.me` como sender | ADR-0007 ([índice](./adr/README.md)) |
+> | §1 — quando **não** usar grafo | [ADR-0009 — A Regra do Turno](./adr/0009-regra-do-turno.md) |
+> | §6 — dois scrapers, papéis distintos | [ADR-0011 — Apify descobre, Firecrawl enriquece](./adr/0011-apify-descoberta-firecrawl-enriquecimento.md) |
 >
 > **O que mudou no código desde a escrita original (T1, 2026-08-11):**
 >
@@ -51,13 +51,13 @@ type: wiki
 >    dedupe **na frente** do pipeline — quem já foi contatado nunca volta a consumir
 >    token de qualifier ou copywriter.
 >
-> Para o estado real do sistema, use sempre [`docs/ESTADO.md`](./docs/ESTADO.md). Para a
+> Para o estado real do sistema, use sempre [`docs/ESTADO.md`](./ESTADO.md). Para a
 > versão didática destes conceitos (analogias, sem código), ver
-> [`docs/GUIA-DIDATICO.md`](./docs/GUIA-DIDATICO.md) Parte 5.
+> [`docs/GUIA-DIDATICO.md`](./GUIA-DIDATICO.md) Parte 5.
 >
 > **Sobre a §1 abaixo:** ela argumenta por que grafos, mas não diz quando *não* usá-los —
 > e essa é a parte que faltava. O critério está em
-> [ADR-0009 — A Regra do Turno](./docs/adr/0009-regra-do-turno.md): se o trabalho cabe num
+> [ADR-0009 — A Regra do Turno](./adr/0009-regra-do-turno.md): se o trabalho cabe num
 > turno, é loop de tools; se precisa sobreviver ao turno, é grafo. O padrão é o loop; o
 > grafo é a exceção que se justifica.
 
@@ -350,7 +350,7 @@ Em vez de integrar uma API de WhatsApp (Uazapi/Z-API), usamos o deep-link `https
 
 ## 8. Próximos Passos
 
-**Feito desde a escrita original** (T1, ver [`docs/BACKLOG.md`](./docs/BACKLOG.md)):
+**Feito desde a escrita original** (T1, ver [`docs/BACKLOG.md`](./BACKLOG.md)):
 
 - [x] **Persistência de leads e runs no Supabase** — `lead_key` único, dedupe na frente
 - [x] **Nó de enriquecimento (Firecrawl)** — qualificação sobre fato, não sobre URL
@@ -360,15 +360,15 @@ Em vez de integrar uma API de WhatsApp (Uazapi/Z-API), usamos o deep-link `https
 **Aberto, na ordem em que destrava credibilidade:**
 
 - [ ] **Harness de evals** — aderência do copywriter às 10 regras, consistência do
-      qualifier, recall do RAG. É a lacuna #1 do [`docs/ESTADO.md`](./docs/ESTADO.md):
+      qualifier, recall do RAG. É a lacuna #1 do [`docs/ESTADO.md`](./ESTADO.md):
       hoje a saída dos nós é *admirada*, não *medida*. Especificado em
-      [`docs/EVAL.md`](./docs/EVAL.md)
+      [`docs/EVAL.md`](./EVAL.md)
 - [ ] **Lint zerado + `typecheck` + CI** — `npm run lint` está vermelho na `main`;
       consertar antes de montar CI, senão o build nasce vermelho e todos aprendem a ignorar
 - [ ] **Deploy Railway + Redis** — `RedisSaver` para o workflow pausado sobreviver a
       restart. Hoje é só `MemorySaver`: restart mata revisão pendente
 - [ ] **Templates de Workflow** — segundo grafo só depois de a prospecção dar dinheiro, e
-      só se passar na Regra do Turno ([ADR-0009](./docs/adr/0009-regra-do-turno.md)). O
+      só se passar na Regra do Turno ([ADR-0009](./adr/0009-regra-do-turno.md)). O
       único candidato hoje é o pipeline de conteúdo do canal
 - [ ] ⏸ **Sender Node** — disparo automático de WhatsApp. **Adiado com gatilho explícito:**
       o `wa.me` + clique humano é *melhor* enquanto a mensagem não estiver provada (custo

@@ -11,7 +11,7 @@ ainda não sabe qual pergunta está respondendo.
 | **[BACKLOG.md](./BACKLOG.md)** | **O que vem depois**, sequenciado por impacto | Quando sobrar tempo e faltar clareza |
 | **[EVAL.md](./EVAL.md)** | **Como saber** se o agente está bom | Antes de mexer em qualquer prompt |
 | **[GUIA-DIDATICO.md](./GUIA-DIDATICO.md)** | **Como explicar** para quem não é da área | Base do roteiro de vídeo; leigos. Marca com ⛔ o que ainda não existe |
-| **[../LANGGRAPH_MULTI_AGENT_GUIDE.md](../LANGGRAPH_MULTI_AGENT_GUIDE.md)** | Material didático sobre LangGraph | Estudo. As *decisões* que estavam nele agora vivem em `adr/` |
+| **[GUIA-LANGGRAPH.md](./GUIA-LANGGRAPH.md)** | Material didático sobre LangGraph | Estudo. As *decisões* que estavam nele agora vivem em `adr/` |
 
 ---
 

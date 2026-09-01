@@ -116,4 +116,4 @@ não estimado.
 | [`../PRD.md`](../PRD.md) | **Para que** o Odin existe — propósito, usuário, princípios |
 | [`../BACKLOG.md`](../BACKLOG.md) | **O que vem depois**, sequenciado |
 | [`../GUIA-DIDATICO.md`](../GUIA-DIDATICO.md) | **Como explicar** para quem não é da área |
-| [`../../LANGGRAPH_MULTI_AGENT_GUIDE.md`](../../LANGGRAPH_MULTI_AGENT_GUIDE.md) | Material didático sobre LangGraph. As *decisões* que estavam nele agora vivem aqui |
+| [`../GUIA-LANGGRAPH.md`](../GUIA-LANGGRAPH.md) | Material didático sobre LangGraph. As *decisões* que estavam nele agora vivem aqui |
