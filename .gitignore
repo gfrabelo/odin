@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Artefatos de canal (roteiro de vídeo e deck de apresentação).
+# Ficam locais: são material de produção de conteúdo, não de engenharia,
+# e carregam narrativa pessoal que não pertence a um repo público.
+docs/ROTEIRO-VIDEO.md
+docs/apresentacao-odin.html

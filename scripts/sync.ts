@@ -8,7 +8,8 @@
  * ⚠ Este é o "Salto B" (MECÂNICO): wiki/ → índice vetorial. Read-only no vault.
  *   NÃO é o ritual INGEST do Karpathy (raw/ → wiki/, que é INTELECTUAL).
  *
- * ⚠ CONFIDENCIALIDADE: `it-lean-confidencial` é EXCLUÍDA (hard guard).
+ * ⚠ CONFIDENCIALIDADE: as pastas de `getHardExclude()` são EXCLUÍDAS (hard guard):
+ *   o default `confidencial` mais o que vier em `VAULT_EXCLUDE`.
  */
 import { config } from "dotenv";
 import { createHash } from "node:crypto";
@@ -16,7 +17,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep, basename } from "node:path";
 import { embedDocuments } from "../lib/rag/embeddings";
 import { getSupabase } from "../lib/rag/supabase";
-import { HARD_EXCLUDE, getVaultPath, stripFrontmatter } from "../lib/vault";
+import { getHardExclude, getVaultPath, stripFrontmatter } from "../lib/vault";
 
 config({ path: ".env.local" });
 
@@ -33,7 +34,7 @@ function walk(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
-    if (HARD_EXCLUDE.some((ex) => full.includes(ex))) continue;
+    if (getHardExclude().some((ex) => full.toLowerCase().includes(ex))) continue;
     const st = statSync(full);
     if (st.isDirectory()) out.push(...walk(full));
     else if (name.endsWith(".md")) out.push(full);

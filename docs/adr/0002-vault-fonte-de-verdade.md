@@ -49,8 +49,9 @@ no limite de repositório, não numa convenção.
   reconstrói.
 - Portabilidade: o vault sobrevive à morte do Odin. Se o projeto acabar amanhã, o
   conhecimento não perde nada.
-- Confidencialidade é aplicável num ponto só: `HARD_EXCLUDE` em `lib/vault.ts` bloqueia
-  `it-lean-confidencial` no sync **e** na leitura de nota.
+- Confidencialidade é aplicável num ponto só: `getHardExclude()` em `lib/vault.ts` bloqueia
+  as pastas confidenciais no sync **e** na leitura de nota. (Os nomes dessas pastas saíram
+  do código para `VAULT_EXCLUDE` quando o repositório foi aberto; a decisão não mudou.)
 
 ### O que estamos pagando por isso
 

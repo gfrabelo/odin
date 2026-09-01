@@ -90,7 +90,7 @@ maior decisão em aberto: continuar pessoal vs. virar produto).
    única verdade. Dado só flui ladeira abaixo:
    `cérebro → Obsidian → wiki/ → Supabase → Odin`. **Nunca para cima** (o Odin lê, não escreve
    no cérebro — ainda; ver `writeObsidianNote` no roadmap).
-5. **Confidencialidade.** Material sensível (`it-lean-confidencial`) **nunca** é indexado
+5. **Confidencialidade.** Material sensível (pastas listadas em `VAULT_EXCLUDE`, mais o default `confidencial`) **nunca** é indexado
    (hard guard no sync e na leitura de notas).
 6. **Imersão importa.** A UI é deliberadamente cinematográfica (robô 3D, glass, shader, glow
    pulse sincronizado à voz). O "encanto" é feature, não enfeite.

@@ -1,6 +1,8 @@
 # ESTADO — retrato honesto do Odin
 
-> **Data:** 2026-08-11 · **Commit de referência:** T1 do [`BACKLOG.md`](./BACKLOG.md) implementado
+> **Data:** 2026-09-01 · **Commit de referência:** T1 do [`BACKLOG.md`](./BACKLOG.md) implementado,
+> mais a limpeza para abertura do repositório (guard de confidencialidade via env, guard da
+> rota de sync, seção de segurança no `README.md`)
 >
 > Este documento é o retrato do sistema **como ele é**, não como foi planejado.
 > Regra de escrita: toda afirmação cita `arquivo:linha`. Nada aqui vem de memória
@@ -34,8 +36,9 @@ Verificado contra o código, não contra o roadmap.
 | 15 | **Copywriter em batch, com mensagem no link** | `lib/workflows/nodes/copywriter.ts` | Uma chamada estruturada para N leads; `?text=` preenchido. Correlação por `index`, não por ordem |
 | 16 | **Persistência de leads e runs** | `supabase/prospect.sql`, `lib/prospect/repository.ts` | `lead_key` único; upsert nunca sobrescreve `contact_status` |
 | 17 | **Dedupe de já-contatados** | `lib/workflows/nodes/researcher.ts` | Filtra na frente do pipeline, poupando tokens de qualifier e copywriter |
-| 18 | Guarda de confidencialidade | `lib/vault.ts` (`HARD_EXCLUDE`) | `it-lean-confidencial` bloqueado no sync **e** na leitura, com guard de path-traversal |
+| 18 | Guarda de confidencialidade | `lib/vault.ts` (`getHardExclude`) | Bloqueia no sync **e** na leitura, com guard de path-traversal. Default `confidencial` + `VAULT_EXCLUDE` do env; falha **fechado** (env vazio cai no default, nunca em lista vazia) |
 | 19 | Widget de surf | `app/api/surf/route.ts`, `components/interface/SurfWidget.tsx` | Peruíbe/SP fixo, `revalidate: 900` |
+| 20 | Guard da rota de sync | `app/api/sync/route.ts` (`isAuthorized`) | Única rota que spawna processo. Liberada em dev; em produção exige `SYNC_TOKEN` e **recusa se o token não existir** |
 
 **O caminho feliz da prospecção, como ele roda hoje:**
 
@@ -66,7 +69,7 @@ Ordenado por impacto, não por dificuldade.
 | 6 | Só `MemorySaver` | `lib/workflows/checkpointer.ts` | Restart mata workflow parado esperando revisão. O caminho Redis existe mas o pacote não está no `package.json` |
 | 7 | Chunking cego a markdown | `scripts/sync.ts:44-55` | Corta a 1200 chars no meio de seção e tabela |
 | 8 | Comentário do schema mente sobre o modelo | `supabase/schema.sql:13` | Diz `text-embedding-004`; o código usa `gemini-embedding-001` truncado a 768 (`lib/rag/embeddings.ts`) |
-| 9 | Código morto | `components/ui/web-gl-shader.tsx`, `button.tsx`, `card.tsx`, `copywriter-system.md` (raiz), `@anthropic-ai/sdk` no `package.json` | Sedimento de refactors que nunca removeram o antigo |
+| 9 | Código morto | `components/ui/web-gl-shader.tsx`, `button.tsx`, `card.tsx`, `copywriter-system.md` (raiz) | Sedimento de refactors que nunca removeram o antigo. O `@anthropic-ai/sdk` saiu do `package.json` na limpeza de 2026-09-01 (nenhum import em `lib/`, `app/` ou `scripts/`) |
 | 10 | Sem guarda de idempotência na persistência | `app/api/workflow/route.ts` (`persistState`) | A gravação vive na rota justamente para evitar a reexecução do nó no resume. Se um dia o grafo rodar fora do HTTP (cron), isso migra para um nó e **precisa** de guarda — o upsert por `lead_key` cobre, mas o run não |
 
 **Resolvido no T1** (2026-08-11), mantido aqui como histórico do que foi consertado:

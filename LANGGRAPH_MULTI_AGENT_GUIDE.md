@@ -17,7 +17,7 @@ type: wiki
 
 ---
 
-> ### ⚠️ Como ler este documento (atualizado em 2026-08-11)
+> ### ⚠️ Como ler este documento (atualizado em 2026-08-26)
 >
 > Este é um **documento didático** — ele ensina LangGraph usando o Odin como caso.
 > Ele **não é mais a fonte canônica das decisões de arquitetura**. As decisões que
@@ -30,21 +30,36 @@ type: wiki
 > | §5 — `globalThis` e hot-reload | ADR-0005 ([índice](./docs/adr/README.md)) |
 > | §6 — Fallbacks em cascata | [ADR-0004 — Fallbacks em cascata](./docs/adr/0004-fallbacks-em-cascata.md) |
 > | §6 — `wa.me` como sender | ADR-0007 ([índice](./docs/adr/README.md)) |
+> | §1 — quando **não** usar grafo | [ADR-0009 — A Regra do Turno](./docs/adr/0009-regra-do-turno.md) |
+> | §6 — dois scrapers, papéis distintos | [ADR-0011 — Apify descobre, Firecrawl enriquece](./docs/adr/0011-apify-descoberta-firecrawl-enriquecimento.md) |
 >
-> **Duas coisas descritas aqui não correspondem mais ao código:**
+> **O que mudou no código desde a escrita original (T1, 2026-08-11):**
 >
 > 1. **A rotação lead-a-lead da §4 foi aposentada.** O código da "solução" mostrado ali
->    (com `currentLeadIndex++`) é histórico: o pipeline hoje qualifica **todos os leads
->    numa chamada em batch**, e `currentLeadIndex` é campo legado. A *lição* segue
->    valendo integralmente — só a implementação mudou.
-> 2. **O Copywriter não é roteado.** Ele aparece nos diagramas como parte do fluxo, mas
->    o supervisor nunca aponta para ele. Ver [`docs/ESTADO.md`](./docs/ESTADO.md) §2.
+>    (com `currentLeadIndex++`) é histórico: o pipeline hoje qualifica e escreve para
+>    **todos os leads em chamadas batch**, correlacionadas por `index`, e
+>    `currentLeadIndex` é campo legado. A *lição* segue valendo integralmente — só a
+>    implementação mudou.
+> 2. **O Copywriter agora é roteado.** Quando este guia foi escrito, ele era código morto.
+>    Hoje o branch 6 do supervisor o alcança, derivado de
+>    `qualifiedLeads.some(l => l.qualified && !l.message)`.
+> 3. **Existe um sexto nó: o `enricher`.** Ele abre o site de cada lead via Firecrawl,
+>    em paralelo, **antes** do qualifier — que passou a pontuar sobre o conteúdo real do
+>    site em vez de adivinhar pela URL. Nó separado, e não um passo dentro do researcher,
+>    por granularidade de checkpoint.
+> 4. **Leads e runs são persistidos** (`supabase/prospect.sql`), com `lead_key` estável e
+>    dedupe **na frente** do pipeline — quem já foi contatado nunca volta a consumir
+>    token de qualifier ou copywriter.
 >
-> Para o estado real do sistema, use sempre [`docs/ESTADO.md`](./docs/ESTADO.md).
+> Para o estado real do sistema, use sempre [`docs/ESTADO.md`](./docs/ESTADO.md). Para a
+> versão didática destes conceitos (analogias, sem código), ver
+> [`docs/GUIA-DIDATICO.md`](./docs/GUIA-DIDATICO.md) Parte 5.
 >
 > **Sobre a §1 abaixo:** ela argumenta por que grafos, mas não diz quando *não* usá-los —
 > e essa é a parte que faltava. O critério está em
-> [ADR-0009 — A Regra do Turno](./docs/adr/0009-regra-do-turno.md).
+> [ADR-0009 — A Regra do Turno](./docs/adr/0009-regra-do-turno.md): se o trabalho cabe num
+> turno, é loop de tools; se precisa sobreviver ao turno, é grafo. O padrão é o loop; o
+> grafo é a exceção que se justifica.
 
 ---
 
@@ -77,9 +92,10 @@ graph TD
 
     subgraph Pattern 2: Supervisor (Hub and Spoke - Escolhido)
         S[🧠 Supervisor] <--> A1[🔍 Researcher]
-        S <--> A2[📊 Qualifier]
-        S <--> A3[✍️ Copywriter]
-        S <--> A4[👤 Human Review]
+        S <--> A2[🌐 Enricher]
+        S <--> A3[📊 Qualifier]
+        S <--> A4[✍️ Copywriter]
+        S <--> A5[👤 Human Review]
     end
 ```
 
@@ -319,9 +335,12 @@ Em vez de integrar uma API de WhatsApp (Uazapi/Z-API), usamos o deep-link `https
 
 | Padrão | Aplicação no Odin |
 |--------|------------------|
-| **Supervisor Determinístico** | Regras em código para rotação de leads, limpeza de estado e terminação |
+| **Supervisor Determinístico** | `if/else` puro, 7 branches, todos derivados do estado — nenhum depende de flag a resetar |
 | **LLM para Cognição** | Qualifier (scoring), Copywriter (redação), Researcher (extração) |
-| **Fallback em Cascata** | Apify → Tavily → Mock; Redis → MemorySaver |
+| **Chamada em Batch** | Uma requisição para N leads no qualifier e no copywriter, correlacionada por `index` — não N requisições |
+| **Descobrir ≠ Enriquecer** | Apify lista o diretório fechado (Maps); Firecrawl aprofunda na web aberta. Nós separados |
+| **Dedupe na Frente** | `lead_key` estável filtra já-contatados antes do primeiro token pago |
+| **Fallback em Cascata** | Apify → Tavily → Mock; Firecrawl → pula o nó; Redis → MemorySaver |
 | **globalThis Singleton** | Checkpointer sobrevive ao hot-reload do Next.js |
 | **HITL via interrupt()** | Pausa antes de ação externa, resume com Command |
 | **SSE Streaming** | Eventos em tempo real para a UI sem WebSocket |
@@ -331,9 +350,28 @@ Em vez de integrar uma API de WhatsApp (Uazapi/Z-API), usamos o deep-link `https
 
 ## 8. Próximos Passos
 
-- [ ] **OpenAI como provedor alternativo nos Workflows** — gpt-4o-mini para reduzir custo
-- [ ] **Persistência de Leads no Supabase** — CRM pessoal com histórico de prospecção
-- [ ] **Deploy Railway + Redis** — RedisSaver para checkpointing em produção
-- [ ] **Templates de Workflow** — workflows reutilizáveis (prospecção, auditoria IA, follow-up)
-- [ ] **Sender Node** — disparo automático de WhatsApp via API (Uazapi/Z-API)
+**Feito desde a escrita original** (T1, ver [`docs/BACKLOG.md`](./docs/BACKLOG.md)):
+
+- [x] **Persistência de leads e runs no Supabase** — `lead_key` único, dedupe na frente
+- [x] **Nó de enriquecimento (Firecrawl)** — qualificação sobre fato, não sobre URL
+- [x] **Copywriter roteado e em batch** — mensagem por lead, `?text=` no link
+- [x] **Guarda de loop** — `researchAttempts` + branch de saída + `recursionLimit`
+
+**Aberto, na ordem em que destrava credibilidade:**
+
+- [ ] **Harness de evals** — aderência do copywriter às 10 regras, consistência do
+      qualifier, recall do RAG. É a lacuna #1 do [`docs/ESTADO.md`](./docs/ESTADO.md):
+      hoje a saída dos nós é *admirada*, não *medida*. Especificado em
+      [`docs/EVAL.md`](./docs/EVAL.md)
+- [ ] **Lint zerado + `typecheck` + CI** — `npm run lint` está vermelho na `main`;
+      consertar antes de montar CI, senão o build nasce vermelho e todos aprendem a ignorar
+- [ ] **Deploy Railway + Redis** — `RedisSaver` para o workflow pausado sobreviver a
+      restart. Hoje é só `MemorySaver`: restart mata revisão pendente
+- [ ] **Templates de Workflow** — segundo grafo só depois de a prospecção dar dinheiro, e
+      só se passar na Regra do Turno ([ADR-0009](./docs/adr/0009-regra-do-turno.md)). O
+      único candidato hoje é o pipeline de conteúdo do canal
+- [ ] ⏸ **Sender Node** — disparo automático de WhatsApp. **Adiado com gatilho explícito:**
+      o `wa.me` + clique humano é *melhor* enquanto a mensagem não estiver provada (custo
+      zero, risco de ban zero, HITL por construção). Gatilho: primeiro contrato fechado *e*
+      envio manual virando gargalo medido
 

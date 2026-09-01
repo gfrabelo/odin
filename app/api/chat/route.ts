@@ -1,7 +1,7 @@
 import { streamOdinResponse } from "@/lib/ai/chat";
 import type { ChatRequest } from "@/types";
 
-// O SDK Anthropic precisa do runtime Node.
+// Os SDKs de LLM e a leitura do vault (node:fs) precisam do runtime Node.
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {

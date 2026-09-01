@@ -8,8 +8,29 @@
 import { readFile, stat } from "node:fs/promises";
 import { basename, join, resolve, sep } from "node:path";
 
-/** Pastas que NUNCA podem ser lidas/indexadas (hard guard de confidencialidade). */
-export const HARD_EXCLUDE = ["it-lean-confidencial"];
+/**
+ * Fragmentos de caminho que NUNCA podem ser lidos/indexados (hard guard de
+ * confidencialidade). O default cobre qualquer pasta com "confidencial" no
+ * nome; `VAULT_EXCLUDE` (lista separada por vírgula) acrescenta os nomes reais
+ * do vault de cada um — que não pertencem a um repositório público.
+ *
+ * A lista NUNCA pode ficar vazia: env em branco ou malformado cai no default
+ * em vez de desligar o guard. Falhar aberto aqui vazaria material sensível.
+ */
+const DEFAULT_HARD_EXCLUDE = ["confidencial"];
+
+/**
+ * Lida em tempo de chamada (não em module-init) pelo mesmo motivo de
+ * `getVaultPath`: no script de sync o `config()` do dotenv roda depois do
+ * import deste módulo.
+ */
+export function getHardExclude(): string[] {
+  const parsed = (process.env.VAULT_EXCLUDE ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return parsed.length > 0 ? [...DEFAULT_HARD_EXCLUDE, ...parsed] : DEFAULT_HARD_EXCLUDE;
+}
 
 /**
  * Raiz do vault. Lida em tempo de chamada (não em module-init) para respeitar a
@@ -34,7 +55,7 @@ export function stripFrontmatter(text: string): string {
  * Seguro por construção:
  *  - aceita caminho com ou sem extensão `.md`;
  *  - guard contra path-traversal: o alvo resolvido tem que ficar DENTRO do vault;
- *  - respeita `HARD_EXCLUDE` (mesma confidencialidade do sync);
+ *  - respeita `getHardExclude()` (mesma confidencialidade do sync);
  *  - retorna `null` se não existir / não for arquivo (a tool transforma em `{ error }`).
  */
 export async function readNote(
@@ -51,7 +72,8 @@ export async function readNote(
   // Guard de path-traversal: precisa estar sob a raiz do vault.
   if (target !== vaultRoot && !target.startsWith(vaultRoot + sep)) return null;
   // Guard de confidencialidade.
-  if (HARD_EXCLUDE.some((ex) => target.includes(ex))) return null;
+  const lowerTarget = target.toLowerCase();
+  if (getHardExclude().some((ex) => lowerTarget.includes(ex))) return null;
 
   try {
     const st = await stat(target);

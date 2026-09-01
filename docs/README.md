@@ -10,7 +10,7 @@ ainda não sabe qual pergunta está respondendo.
 | **[PRD.md](./PRD.md)** | **Para que** o Odin existe — propósito, usuário, princípios | LLM carregando contexto; feedback de produto |
 | **[BACKLOG.md](./BACKLOG.md)** | **O que vem depois**, sequenciado por impacto | Quando sobrar tempo e faltar clareza |
 | **[EVAL.md](./EVAL.md)** | **Como saber** se o agente está bom | Antes de mexer em qualquer prompt |
-| **[GUIA-DIDATICO.md](./GUIA-DIDATICO.md)** | **Como explicar** para quem não é da área | Roteiro de vídeo; leigos |
+| **[GUIA-DIDATICO.md](./GUIA-DIDATICO.md)** | **Como explicar** para quem não é da área | Base do roteiro de vídeo; leigos. Marca com ⛔ o que ainda não existe |
 | **[../LANGGRAPH_MULTI_AGENT_GUIDE.md](../LANGGRAPH_MULTI_AGENT_GUIDE.md)** | Material didático sobre LangGraph | Estudo. As *decisões* que estavam nele agora vivem em `adr/` |
 
 ---
@@ -19,6 +19,12 @@ ainda não sabe qual pergunta está respondendo.
 
 **Ao entregar uma feature:** atualize o `ESTADO.md` (§1 ganha linha, §2 perde linha) e o
 `GUIA-DIDATICO.md` (o conceito, em linguagem de leigo).
+
+**A cadeia de derivação é uma via de mão única:** `código → ESTADO.md → GUIA-DIDATICO.md`.
+O guia nunca descreve o que o ESTADO não confirma, e o material de divulgação — roteiro de
+vídeo e deck, que vivem fora do versionamento (ver `.gitignore`) — nunca inventa capacidade
+que o guia não descreve. Foi assim que o roteiro v1 acabou prometendo voz "sem API paga" —
+o TTS é OpenAI e é pago desde sempre.
 
 **Ao tomar uma decisão que tinha alternativa:** escreva um ADR. Se não havia alternativa,
 não é decisão — é fato, e fato mora no `ESTADO.md`.

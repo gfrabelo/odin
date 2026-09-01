@@ -7,6 +7,29 @@ O **Odin** é um assistente de inteligência artificial pessoal com duas grandes
 
 ---
 
+## Status honesto
+
+**Protótipo pessoal funcional, single-user, feito para rodar local.** Não há autenticação,
+não há deploy público, e o `.env.local` é a única forma de configurar credenciais.
+
+O que **não** existe, dito antes que você descubra: zero testes, zero CI, zero evals, e
+`npm run lint` está vermelho na `main` (15 erros, em maioria regras do React Compiler).
+`npm run build` passa. O inventário completo — com `arquivo:linha` para cada afirmação —
+está em [`docs/ESTADO.md`](./docs/ESTADO.md) §2.
+
+## Como ler este repositório
+
+Se você tem quinze minutos e quer avaliar o raciocínio, não o volume de código:
+
+| Leia | Porque |
+|---|---|
+| [`docs/ESTADO.md`](./docs/ESTADO.md) | O retrato verificado do sistema: o que existe, o que falta, o que está ambíguo. Toda linha cita `arquivo:linha`. §2.1 conta por que este documento passou a existir |
+| [`docs/adr/0003`](./docs/adr/0003-supervisor-deterministico.md) | A decisão mais cara do projeto, tomada depois de um bug de loop infinito: **LLM para cognição, TypeScript para controle** |
+| [`docs/adr/0009`](./docs/adr/0009-regra-do-turno.md) | O critério que decide quando escalar para um grafo — e quando não. Evita construir agente por construir |
+| [`docs/adr/`](./docs/adr/) | As onze decisões, com o que foi descartado e o que estamos pagando por cada escolha |
+
+---
+
 ## 🌌 Visão Geral da Interface
 
 A interface do Odin funciona em duas abas: **Chat** (assistente pessoal) e **⚡ Agents** (workflows multi-agente).
@@ -161,6 +184,42 @@ graph TD
 
 ---
 
+## 🔒 Segurança e escopo
+
+Este repositório é uma **demonstração de engenharia**, não um serviço. O modelo de ameaça
+assumido é "roda no meu laptop", e as consequências disso estão declaradas aqui em vez de
+descobertas por quem clonar.
+
+**O que o código protege:**
+
+* **Segredo nunca entra no repo.** Todas as credenciais vêm de `.env.local`, que é
+  gitignorado. Só o `.env.local.example` — com campos vazios — é versionado.
+* **Vault é somente leitura.** Nenhum caminho de código escreve no Obsidian
+  ([ADR-0002](./docs/adr/0002-vault-fonte-de-verdade.md)).
+* **Hard guard de confidencialidade.** `getHardExclude()` em `lib/vault.ts` bloqueia pastas
+  sensíveis **no sync e na leitura**, e falha fechado: `VAULT_EXCLUDE` vazio ou malformado
+  cai no default em vez de desligar o guard.
+* **Guard de path-traversal.** `readObsidianNote` resolve o alvo e recusa qualquer caminho
+  que escape da raiz do vault — a tool é exposta ao LLM, então o argumento é entrada não
+  confiável por definição.
+* **Chaves só no servidor.** Nenhuma credencial cruza para o client; TTS, Gemini, Apify e
+  Firecrawl são chamados de route handlers.
+* **`/api/sync` falha fechado.** É a única rota que spawna processo. Liberada em dev;
+  em produção exige `SYNC_TOKEN`, e recusa todo mundo se o token não estiver configurado.
+
+**O que ele não protege — porque não é o escopo:**
+
+* **Não há autenticação.** As rotas `/api/chat`, `/api/workflow`, `/api/tts` e
+  `/api/suggestions` são abertas a quem alcançar o processo. Rodando em `localhost`, isso é
+  o desenho; exposto à internet, é queima de cota de API por qualquer um.
+* **Não há rate limit** nem orçamento por sessão.
+* **Não há RLS no Supabase** — o acesso é via `service_role` a partir do servidor.
+
+> **Antes de qualquer deploy público:** auth nas rotas, rate limit e `SYNC_TOKEN`
+> configurado. O item de deploy no roadmap depende disso, não o contrário.
+
+---
+
 ## 🚀 Como Rodar o Projeto Localmente
 
 ### 1. Clonar o repositório
@@ -182,9 +241,11 @@ Preencha com suas credenciais:
 | `SUPABASE_URL` | — | URL do projeto Supabase (RAG) |
 | `SUPABASE_SERVICE_ROLE_KEY` | — | Service role key do Supabase |
 | `VAULT_PATH` | — | Caminho local do vault Obsidian (padrão: `../segundo-cerebro`) |
+| `VAULT_EXCLUDE` | — | Pastas do vault sempre bloqueadas, separadas por vírgula. Somadas ao default `confidencial` |
 | `APIFY_API_TOKEN` | — | Token Apify para o Google Maps Scraper — **descoberta** de leads |
 | `FIRECRAWL_API_KEY` | — | Token Firecrawl — **enriquecimento** (abre o site do lead). Sem ela, o Enricher é pulado |
 | `SEARCH_API_KEY` | — | Chave Tavily para busca web real |
+| `SYNC_TOKEN` | — | Só em produção: libera `POST /api/sync`. Sem ele, a rota recusa em produção |
 
 ### 3. Configurar o Banco de Dados (Supabase)
 No painel SQL Editor do Supabase, execute **os dois** arquivos:
@@ -249,3 +310,11 @@ npm run sync
 
 **Adiado, com gatilho explícito**
 * ⏸ **Sender automático (Uazapi/Z-API)** — o `wa.me` + clique humano é *melhor* enquanto a mensagem não estiver provada: custo zero, risco de ban zero, humano no loop por construção. Automatizar o disparo antes de fechar o primeiro contrato não escala vendas, escala queima de lead — e destrói a propriedade que o copywriter mais persegue ("parece digitada no celular"). **Gatilho:** primeiro contrato fechado *e* envio manual virando gargalo medido. Ver [ADR-0007](./docs/adr/README.md)
+
+---
+
+## Licença
+
+[MIT](./LICENSE). O código é livre; as anotações do vault que alimentam o RAG **não**
+fazem parte deste repositório e vivem noutro lugar
+([ADR-0002](./docs/adr/0002-vault-fonte-de-verdade.md)).

@@ -56,8 +56,11 @@ repositório (`../segundo-cerebro`) e nenhum código aqui escreve nele.
 [ADR-0002](./docs/adr/0002-vault-fonte-de-verdade.md).
 
 **5. Confidencialidade é hard guard, não convenção.**
-`HARD_EXCLUDE` em `lib/vault.ts` bloqueia `it-lean-confidencial` no sync **e** na leitura
-de notas, junto com o guard de path-traversal. Não afrouxe nenhum dos dois.
+`getHardExclude()` em `lib/vault.ts` bloqueia as pastas confidenciais no sync **e** na
+leitura de notas, junto com o guard de path-traversal. A lista vem do default
+(`confidencial`) somado a `VAULT_EXCLUDE`, e **falha fechado**: env vazio cai no default,
+nunca em lista vazia. Não afrouxe nenhum dos dois guards, e não deixe o guard virar
+lista vazia.
 
 ## Ao escrever código
 

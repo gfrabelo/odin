@@ -546,15 +546,16 @@ summary {
 
 /* Node Graph */
 .workflow-graph {
-  display: grid;
   /*
-    Colunas automaticas em vez de numero fixo: o grafo tinha repeat(5)
-    cravado e, quando entrou o 6o no (Analise de Site), o ultimo quebrou
-    para a segunda linha. Com auto-flow: column a regua acompanha a
-    quantidade de nos sozinha - some o numero magico acoplado ao AGENT_ORDER.
+    Flex com nowrap em vez de grid: o grafo tinha 5 colunas cravadas e,
+    quando entrou o 6o no (Analise de Site), o ultimo quebrava para a
+    segunda linha. Flex nowrap NAO pode quebrar por especificacao, entao
+    a regua acompanha a quantidade de nos sozinha - some o numero magico
+    acoplado ao AGENT_ORDER.
   */
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
   gap: 0.35rem;
   padding: 0.65rem 0.4rem;
   background: rgba(255, 255, 255, 0.02);
@@ -567,7 +568,8 @@ summary {
   display: flex;
   align-items: center;
   position: relative;
-  width: 100%;
+  /* flex-basis 0 = todos dividem a largura por igual, independente do texto */
+  flex: 1 1 0;
   min-width: 0;
 }
 
