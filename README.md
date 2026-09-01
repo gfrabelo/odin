@@ -7,26 +7,31 @@ O **Odin** é um assistente de inteligência artificial pessoal com duas grandes
 
 ---
 
-## Status honesto
+## O que este repositório demonstra
 
-**Protótipo pessoal funcional, single-user, feito para rodar local.** Não há autenticação,
-não há deploy público, e o `.env.local` é a única forma de configurar credenciais.
+Chamar a API de um LLM é fácil. O que separa isso de um sistema são as decisões que
+aparecem quando ele quebra:
 
-O que **não** existe, dito antes que você descubra: zero testes, zero CI, zero evals, e
-`npm run lint` está vermelho na `main` (15 erros, em maioria regras do React Compiler).
-`npm run build` passa. O inventário completo — com `arquivo:linha` para cada afirmação —
-está em [`docs/ESTADO.md`](./docs/ESTADO.md) §2.
+**Controle é código, cognição é modelo.** O supervisor do grafo é `if/else` puro, zero
+LLM, com todos os branches derivados do estado — decisão tomada *depois* de um loop
+infinito em produção, não antes. [ADR-0003](./docs/adr/0003-supervisor-deterministico.md).
 
-## Como ler este repositório
+**Existe um critério pra escalar, e ele diz "não" com frequência.** A Regra do Turno
+separa o que é loop de tools do que precisa virar grafo. "Tem vários passos" e "tem ciclo"
+explicitamente não contam. [ADR-0009](./docs/adr/0009-regra-do-turno.md).
 
-Se você tem quinze minutos e quer avaliar o raciocínio, não o volume de código:
+**Degradar não pode ser silencioso.** Toda capacidade cai em cascata em vez de lançar
+(Apify → Tavily → mock), mas todo fallback ativado tem que aparecer — a busca web ficou em
+modo mock por semanas porque falhava calada. [ADR-0004](./docs/adr/0004-fallbacks-em-cascata.md).
 
-| Leia | Porque |
-|---|---|
-| [`docs/ESTADO.md`](./docs/ESTADO.md) | O retrato verificado do sistema: o que existe, o que falta, o que está ambíguo. Toda linha cita `arquivo:linha`. §2.1 conta por que este documento passou a existir |
-| [`docs/adr/0003`](./docs/adr/0003-supervisor-deterministico.md) | A decisão mais cara do projeto, tomada depois de um bug de loop infinito: **LLM para cognição, TypeScript para controle** |
-| [`docs/adr/0009`](./docs/adr/0009-regra-do-turno.md) | O critério que decide quando escalar para um grafo — e quando não. Evita construir agente por construir |
-| [`docs/adr/`](./docs/adr/) | As onze decisões, com o que foi descartado e o que estamos pagando por cada escolha |
+**A documentação não promete além do código.** [`docs/ESTADO.md`](./docs/ESTADO.md) cita
+`arquivo:linha` em toda afirmação, e existe porque uma auditoria pegou este README
+afirmando cinco features que não existiam (§2.1). É também onde estão as lacunas
+conhecidas — se você quer atacar o projeto, comece por lá, o trabalho já está feito.
+
+Protótipo single-user, feito para rodar local. As onze decisões — com o que foi descartado
+e o que estamos pagando por cada escolha — estão em [`docs/adr/`](./docs/adr/); o mapa
+completo da documentação, em [`docs/`](./docs/README.md).
 
 ---
 
