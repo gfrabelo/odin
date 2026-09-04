@@ -167,7 +167,14 @@ async function readObsidianNote(args: ToolArgs): Promise<ToolResult> {
   if (!path) return { error: "path vazio." };
 
   const note = await readNote(path);
-  if (!note) return { error: `Nota não encontrada ou inacessível: ${path}` };
+  if (!note) {
+    return {
+      error:
+        `Nota não encontrada ou inacessível: ${path}. ` +
+        "O vault Obsidian pode não estar disponível neste ambiente. " +
+        "Use searchSecondBrain para pesquisar o conteúdo por semântica.",
+    };
+  }
   return { output: note };
 }
 

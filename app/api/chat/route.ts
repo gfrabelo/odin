@@ -4,6 +4,9 @@ import type { ChatRequest } from "@/types";
 // Os SDKs de LLM e a leitura do vault (node:fs) precisam do runtime Node.
 export const runtime = "nodejs";
 
+// Chat com tool calling pode levar 30–40s. Na Vercel Pro, o teto é 300s.
+export const maxDuration = 120;
+
 export async function POST(req: Request) {
   let body: ChatRequest;
   try {

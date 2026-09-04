@@ -16,8 +16,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Odin - Orquestrador de Conhecimento",
-  description: "A versão externa do cérebro de Gabriel Rabelo.",
+  title: "Odin — Cockpit de IA Pessoal",
+  description:
+    "Assistente de IA com RAG sobre Obsidian, workflows multi-agente, " +
+    "voz bidirecional e interface 3D imersiva. Por Gabriel Rabelo.",
+  openGraph: {
+    title: "Odin — Cockpit de IA Pessoal",
+    description:
+      "Chat com segundo cérebro, prospecção B2B automatizada, " +
+      "e robô 3D interativo. Next.js + Gemini + LangGraph.",
+    type: "website",
+    locale: "pt_BR",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Odin — Cockpit de IA Pessoal",
+    description: "Assistente de IA com RAG, workflows multi-agente e voz.",
+  },
 };
 
 export default function RootLayout({

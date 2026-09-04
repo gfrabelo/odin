@@ -38,6 +38,10 @@ import type {
 
 export const runtime = "nodejs";
 
+// Workflow completo: Apify scraping + enriquecimento + qualifier + copywriter.
+// Pode levar minutos. 300s é o teto da Vercel Pro.
+export const maxDuration = 300;
+
 /**
  * Teto de passos do grafo.
  *

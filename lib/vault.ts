@@ -4,9 +4,20 @@
  *
  * Read-only no vault. Convenções (VAULT_PATH, exclusão confidencial, frontmatter)
  * vivem aqui para não duplicarem entre o "Salto B" mecânico e o function calling.
+ *
+ * Por que `require` dinâmico em vez de `import ... from "node:fs"`:
+ * O Turbopack/NFT rastreia imports estáticos de `node:fs` e `node:path`
+ * combinados com caminhos dinâmicos (`../segundo-cerebro`) e tenta incluir o
+ * projeto inteiro no bundle, falhando a build. Como essas operações só rodam
+ * em runtime (dev local ou sync script), o require dinâmico evita o tracing
+ * sem perder funcionalidade. Na Vercel o vault não existe e `readNote` retorna
+ * null via try/catch — o comportamento é idêntico.
  */
-import { readFile, stat } from "node:fs/promises";
-import { basename, join, resolve, sep } from "node:path";
+
+/* eslint-disable @typescript-eslint/no-require-imports */
+const fs = require(/* turbopackIgnore: true */ "node:fs/promises") as typeof import("node:fs/promises");
+const path = require(/* turbopackIgnore: true */ "node:path") as typeof import("node:path");
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
  * Fragmentos de caminho que NUNCA podem ser lidos/indexados (hard guard de
@@ -37,7 +48,7 @@ export function getHardExclude(): string[] {
  * ordem do dotenv no script de sync, onde `config()` roda antes desta leitura.
  */
 export function getVaultPath(): string {
-  return process.env.VAULT_PATH ?? join("..", "segundo-cerebro");
+  return process.env.VAULT_PATH ?? path.join("..", "segundo-cerebro");
 }
 
 /** Remove o bloco de frontmatter YAML (`--- ... ---`) do topo de uma nota. */
@@ -61,26 +72,26 @@ export function stripFrontmatter(text: string): string {
 export async function readNote(
   relativePath: string
 ): Promise<{ title: string; content: string } | null> {
-  const vaultRoot = resolve(getVaultPath());
+  const vaultRoot = path.resolve(getVaultPath());
 
   let rel = relativePath.trim().replace(/\\/g, "/");
   if (!rel) return null;
   if (!rel.toLowerCase().endsWith(".md")) rel += ".md";
 
-  const target = resolve(vaultRoot, rel);
+  const target = path.resolve(vaultRoot, rel);
 
   // Guard de path-traversal: precisa estar sob a raiz do vault.
-  if (target !== vaultRoot && !target.startsWith(vaultRoot + sep)) return null;
+  if (target !== vaultRoot && !target.startsWith(vaultRoot + path.sep)) return null;
   // Guard de confidencialidade.
   const lowerTarget = target.toLowerCase();
   if (getHardExclude().some((ex) => lowerTarget.includes(ex))) return null;
 
   try {
-    const st = await stat(target);
+    const st = await fs.stat(target);
     if (!st.isFile()) return null;
-    const raw = await readFile(target, "utf8");
+    const raw = await fs.readFile(target, "utf8");
     const content = stripFrontmatter(raw).replace(/\r\n/g, "\n").trim();
-    return { title: basename(target, ".md"), content };
+    return { title: path.basename(target, ".md"), content };
   } catch {
     return null;
   }

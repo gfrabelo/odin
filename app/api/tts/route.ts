@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+// Proxy para OpenAI TTS — normalmente rápido, mas textos longos podem demorar.
+export const maxDuration = 30;
 export async function POST(req: Request) {
   try {
     const { text } = await req.json();
